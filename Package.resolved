@@ -1,0 +1,16 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "LetsMeetModels",
+        "repositoryURL": "git@github.com:AnbionApps/letsmeet-models.git",
+        "state": {
+          "branch": null,
+          "revision": "9d081fd22f6f9da373ccb04fd36520344f29cb67",
+          "version": "0.4.0"
+        }
+      }
+    ]
+  },
+  "version": 1
+}
