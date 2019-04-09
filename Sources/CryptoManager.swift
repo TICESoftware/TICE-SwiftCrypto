@@ -128,7 +128,7 @@ public class CryptoManager {
 
             operationQueue.addOperation {
                 let encryptedMessageKey = self.encrypt(message: encryptionKey, for: member)
-                let recipient = Recipient(userId: member.userId, identityKey: member.user.publicKeys.identityKey, serverSignedMembershipCertificate: serverSignedMembershipCertificate, encryptedMessageKey: encryptedMessageKey)
+                let recipient = Recipient(userId: member.user.userId, identityKey: member.user.publicKeys.identityKey, serverSignedMembershipCertificate: serverSignedMembershipCertificate, encryptedMessageKey: encryptedMessageKey)
 
                 _ = insertRecipientQueue.sync {
                     recipients.insert(recipient)
