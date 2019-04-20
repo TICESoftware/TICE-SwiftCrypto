@@ -14,7 +14,7 @@ let package = Package(
             targets: ["LetsMeetCrypto"]),
     ],
     dependencies: [
-        .package(url: "git@github.com:AnbionApps/letsmeet-models.git", from: "0.4.0")
+        .package(url: "git@github.com:AnbionApps/letsmeet-models.git", from: "2.0.0")
     ],
     targets: [
         .target(
