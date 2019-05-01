@@ -4,16 +4,17 @@
 
 import Foundation
 import LetsMeetModels
+import SwiftJWT
+import CryptorECC
 
-public enum CryptoManagerError: Error {
+public enum CryptoManagerError: LocalizedError {
     case invalidMessageSignature
     case couldNotAccessSignedInUser
     case missingMembershipCertificate(member: Member)
     case decryptionError
     case serializationError(Error)
-}
+    case certificateValidationFailed(Error)
 
-extension CryptoManagerError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .invalidMessageSignature: return "Invalid message signature"
@@ -21,6 +22,23 @@ extension CryptoManagerError: LocalizedError {
         case .missingMembershipCertificate(let member): return "Missing membership certificate for \(member)"
         case .decryptionError: return "Decryption error"
         case .serializationError(let error): return error.localizedDescription
+        case .certificateValidationFailed(let error): return "Certificate validation failed. Reason: \(error.localizedDescription)"
+        }
+    }
+}
+
+public enum CertificateValidationError: LocalizedError {
+    case invalidSignature
+    case invalidMembership
+    case invalidClaims
+    case expired(ValidateClaimsResult)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidSignature: return "Invalid signature"
+        case .invalidMembership: return "Invalid membership"
+        case .invalidClaims: return "Invalid claims"
+        case .expired(let validateClaimsResult): return "Certificate not valid anymore/yet. \(validateClaimsResult.description)"
         }
     }
 }
@@ -38,11 +56,12 @@ public class CryptoManager {
         self.decoder = decoder
     }
 
-    public func generateKeys() -> (UserPublicKeys, PrivateKeys) {
-        let publicKeys = UserPublicKeys(identityKey: "identityKey", ephemeralKey: "ephemeralKey", signedPreKey: "signedPreKey", preKeys: ["preKey1", "preKey2"])
-        let privateKeys = "privateKeys"
+    public func generateKeys() throws -> UserKeyPairs {
 
-        return (publicKeys, privateKeys)
+        let privateSigningKey = try ECPrivateKey.make(for: .secp521r1)
+        let publicSigningKey = try privateSigningKey.extractPublicKey()
+
+        return UserKeyPairs(signingKeys: (privateKey: privateSigningKey, publicKey: publicSigningKey))
     }
 
     public func generateGroupKey() -> String {
@@ -57,16 +76,54 @@ public class CryptoManager {
 
     // MARK: Membership certificates
 
-    public func createSelfSignedMembershipCertificate(for groupId: GroupId, with signer: Signer, userId: UserId) -> Membership {
-        return Membership(userId: userId, groupId: groupId)
+    public func createUserSignedMembershipCertificate(userId: UserId, groupId: GroupId, admin: Bool, signer: Signer) throws -> Certificate {
+        return try createMembershipCertificate(userId: userId, groupId: groupId, admin: admin, issuer: .user(signer.userId), signingKey: signer.certificatePrivateKey)
     }
 
-    public func createSelfSignedAdminCertificate(for groupId: GroupId, with signer: Signer, userId: UserId) -> Membership {
-        return Membership(userId: userId, groupId: groupId, admin: true)
+    public func createServerSignedMembershipCertificate(userId: UserId, groupId: GroupId, admin: Bool, signingKey: ECPrivateKey) throws -> Certificate {
+        return try createMembershipCertificate(userId: userId, groupId: groupId, admin: admin, issuer: .server, signingKey: signingKey)
     }
 
-    public func validate(certificate: Certificate, for groupId: GroupId) -> Bool {
-        return true
+    private func createMembershipCertificate(userId: UserId, groupId: GroupId, admin: Bool, issuer: MembershipClaims.Issuer, signingKey: ECPrivateKey) throws -> Certificate {
+        let issueDate = Date()
+
+        let claims = MembershipClaims(iss: issuer, sub: userId, iat: issueDate, exp: issueDate.addingTimeInterval(3600), groupId: groupId, admin: admin)
+        var jwt = JWT(claims: claims)
+
+        let privateKeyData = signingKey.pemString.data(using: .utf8)!
+        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData)
+
+        return try jwt.sign(using: jwtSigner)
+    }
+
+    public func validateUserSignedMembershipCertificate(certificate: Certificate, membership: Membership, issuer: User) throws {
+        try validate(certificate: certificate, membership: membership, issuer: .user(issuer.userId), publicKey: issuer.publicKeys.signingKey)
+    }
+
+    public func validateServerSignedMembershipCertificate(certificate: Certificate, membership: Membership, publicKey: String) throws {
+        try validate(certificate: certificate, membership: membership, issuer: .server, publicKey: publicKey)
+    }
+
+    private func validate(certificate: Certificate, membership: Membership, issuer: MembershipClaims.Issuer, publicKey: String) throws {
+        let publicKeyData = publicKey.data(using: .utf8)!
+        let jwtVerifier = JWTVerifier.es512(publicKey: publicKeyData)
+
+        let jwt = try JWT<MembershipClaims>(jwtString: certificate)
+
+        guard jwt.claims.groupId == membership.groupId,
+            jwt.claims.sub == membership.userId,
+            (!membership.admin || jwt.claims.admin) else {
+            throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.invalidMembership)
+        }
+
+        guard JWT<MembershipClaims>.verify(certificate, using: jwtVerifier) else {
+            throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.invalidSignature)
+        }
+
+        let validateClaimsResult = jwt.validateClaims()
+        guard validateClaimsResult == .success else {
+            throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.expired(validateClaimsResult))
+        }
     }
 
     public func tokenKeyForGroupWith(groupKey: String, user: UserProtocol) -> String {
@@ -122,13 +179,13 @@ public class CryptoManager {
         let insertRecipientQueue = DispatchQueue(label: "de.anbion.cryptoManager.encrypt")
 
         for member in members {
-            guard let serverSignedMembershipCertificate = member.serverSignedMembershipCertificate else {
+            guard let serverSignedMembershipCertificate = member.membership.serverSignedMembershipCertificate else {
                 throw CryptoManagerError.missingMembershipCertificate(member: member)
             }
 
             operationQueue.addOperation {
                 let encryptedMessageKey = self.encrypt(message: encryptionKey, for: member)
-                let recipient = Recipient(userId: member.user.userId, identityKey: member.user.publicKeys.identityKey, serverSignedMembershipCertificate: serverSignedMembershipCertificate, encryptedMessageKey: encryptedMessageKey)
+                let recipient = Recipient(userId: member.user.userId, serverSignedMembershipCertificate: serverSignedMembershipCertificate, encryptedMessageKey: encryptedMessageKey)
 
                 _ = insertRecipientQueue.sync {
                     recipients.insert(recipient)

@@ -14,15 +14,17 @@ let package = Package(
             targets: ["LetsMeetCrypto"]),
     ],
     dependencies: [
-        .package(url: "git@github.com:AnbionApps/letsmeet-models.git", from: "3.0.0")
+        .package(url: "git@github.com:AnbionApps/letsmeet-models.git", from: "4.0.0"),
+        .package(url: "https://github.com/IBM-Swift/Swift-JWT.git", from: "3.4.1"),
+        .package(url: "https://github.com/IBM-Swift/BlueECC.git", from: "1.2.1")
     ],
     targets: [
         .target(
             name: "LetsMeetCrypto",
-            dependencies: ["LetsMeetModels"],
+            dependencies: ["LetsMeetModels", "SwiftJWT", "CryptorECC"],
             path: "Sources"),
         .testTarget(
             name: "LetsMeetCryptoTests",
-            dependencies: ["LetsMeetCrypto"]),
+            dependencies: ["LetsMeetCrypto", "LetsMeetModels", "SwiftJWT", "CryptorECC"]),
     ]
 )
