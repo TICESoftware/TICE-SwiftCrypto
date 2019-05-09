@@ -11,4 +11,8 @@ public struct UserKeyPairs {
     public var publicKeys: UserPublicKeys {
         return UserPublicKeys(signingKey: signingKeys.publicKey.pemString)
     }
+    
+    public init(signingKeys: (privateKey: ECPrivateKey, publicKey: ECPublicKey)) {
+        self.signingKeys = signingKeys
+    }
 }
