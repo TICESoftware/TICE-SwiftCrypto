@@ -10,7 +10,7 @@ Package.resolved: Package.swift
 
 xcode: LetsMeetCrypto.xcodeproj
 LetsMeetCrypto.xcodeproj: Package.resolved
-	swift package generate-xcodeproj
+	swift package generate-xcodeproj --xcconfig-overrides config.xcconfig
 
 dev: update xcode
 
