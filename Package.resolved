@@ -38,6 +38,15 @@
         }
       },
       {
+        "package": "DoubleRatchet",
+        "repositoryURL": "git@github.com:AnbionApps/DoubleRatchet.git",
+        "state": {
+          "branch": "develop",
+          "revision": "b2d2138d5ba91434d8f357bf770f8e5e509b7223",
+          "version": null
+        }
+      },
+      {
         "package": "HKDF",
         "repositoryURL": "git@github.com:AnbionApps/HKDF.git",
         "state": {
@@ -96,7 +105,7 @@
         "repositoryURL": "git@github.com:AnbionApps/X3DH.git",
         "state": {
           "branch": "develop",
-          "revision": "e5a84320aa5c5f0b4024f0dd2e38700bffe050ec",
+          "revision": "181f441121ebc953d2e569b3382a069fad6a9bcc",
           "version": null
         }
       }

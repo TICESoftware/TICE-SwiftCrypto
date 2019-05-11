@@ -17,15 +17,16 @@ let package = Package(
         .package(url: "git@github.com:AnbionApps/letsmeet-models.git", from: "7.0.0"),
         .package(url: "https://github.com/IBM-Swift/Swift-JWT.git", from: "3.4.1"),
         .package(url: "https://github.com/IBM-Swift/BlueECC.git", from: "1.2.1"),
-        .package(url: "git@github.com:AnbionApps/X3DH.git", .branch("develop"))
+        .package(url: "git@github.com:AnbionApps/X3DH.git", .branch("develop")),
+        .package(url: "git@github.com:AnbionApps/DoubleRatchet.git", .branch("develop"))
     ],
     targets: [
         .target(
             name: "LetsMeetCrypto",
-            dependencies: ["LetsMeetModels", "SwiftJWT", "CryptorECC", "X3DH"],
+            dependencies: ["LetsMeetModels", "SwiftJWT", "CryptorECC", "X3DH", "DoubleRatchet"],
             path: "Sources"),
         .testTarget(
             name: "LetsMeetCryptoTests",
-            dependencies: ["LetsMeetCrypto", "LetsMeetModels", "SwiftJWT", "CryptorECC", "X3DH"]),
+            dependencies: ["LetsMeetCrypto", "LetsMeetModels", "SwiftJWT", "CryptorECC"]),
     ]
 )

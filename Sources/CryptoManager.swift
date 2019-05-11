@@ -6,6 +6,9 @@ import Foundation
 import LetsMeetModels
 import SwiftJWT
 import CryptorECC
+import X3DH
+import DoubleRatchet
+import Sodium
 
 public enum CryptoManagerError: LocalizedError {
     case invalidMessageSignature
@@ -48,10 +51,19 @@ public typealias Certificate = String
 
 public class CryptoManager {
 
+    let info = "Let's Meet"
+    let maxSkip = 100
+    let maxCache = 100
+
+    let handshake: X3DH
+
     let encoder: JSONEncoder
     let decoder: JSONDecoder
 
-    public init(encoder: JSONEncoder, decoder: JSONDecoder) {
+    var doubleRatchets: [UserId: DoubleRatchet] = [:]
+
+    public init(handshake: X3DH?, encoder: JSONEncoder, decoder: JSONDecoder) throws {
+        self.handshake = try handshake ?? X3DH()
         self.encoder = encoder
         self.decoder = decoder
     }
@@ -77,7 +89,7 @@ public class CryptoManager {
     // MARK: Membership certificates
 
     public func createUserSignedMembershipCertificate(userId: UserId, groupId: GroupId, admin: Bool, signer: Signer) throws -> Certificate {
-        return try createMembershipCertificate(userId: userId, groupId: groupId, admin: admin, issuer: .user(signer.userId), signingKey: signer.certificatePrivateKey)
+        return try createMembershipCertificate(userId: userId, groupId: groupId, admin: admin, issuer: .user(signer.userId), signingKey: signer.signingPrivateKey)
     }
 
     public func createServerSignedMembershipCertificate(userId: UserId, groupId: GroupId, admin: Bool, signingKey: ECPrivateKey) throws -> Certificate {
@@ -131,6 +143,19 @@ public class CryptoManager {
     }
 
     // MARK: Encryption / Decryption
+
+    public func createPublicKeyMaterial(signer: Signer) throws -> PublicKeyMaterial {
+        return try handshake.createPrekeyBundle(oneTimePrekeysCount: 10, renewSignedPrekey: false, prekeySigner: { try sign(prekey: $0, with: signer) })
+    }
+
+    public func initConversation(with userId: UserId, remotePrekeyBundle: PrekeyBundle, remoteVerificationKey: ECPublicKey) throws -> ConversationInvitation {
+        let x3dh = try X3DH()
+        let keyAgreementInitiation = try x3dh.initiateKeyAgreement(remotePrekeyBundle: remotePrekeyBundle, prekeySignatureVerifier: { verify(prekeySignature: $0, prekey: remotePrekeyBundle.signedPrekey, verificationPublicKey: remoteVerificationKey) }, info: info)
+
+        doubleRatchets[userId] = try DoubleRatchet(keyPair: nil, remotePublicKey: remotePrekeyBundle.signedPrekey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
+
+        return ConversationInvitation(identityKey: keyAgreementInitiation.identityPublicKey, ephemeralKey: keyAgreementInitiation.ephemeralPublicKey, usedOneTimePrekey: keyAgreementInitiation.usedOneTimePrekey)
+    }
 
     public func encrypt<SettingsType: Encodable>(_ groupSettings: SettingsType) -> String {
         // swiftlint:disable:next force_try
@@ -207,6 +232,17 @@ public class CryptoManager {
     }
 
     // MARK: Sign / verify
+
+    private func sign(prekey: PublicKey, with signer: Signer) throws -> Signatur {
+        let publicKeyData = Data(prekey)
+        let sig = try publicKeyData.sign(with: signer.signingPrivateKey)
+        return sig.asn1
+    }
+
+    private func verify(prekeySignature: Signatur, prekey: PublicKey, verificationPublicKey: ECPublicKey) -> Bool {
+        guard let sig = try? ECSignature(asn1: prekeySignature) else { return false }
+        return sig.verify(plaintext: Data(prekey), using: verificationPublicKey)
+    }
 
     public func sign(_ data: Data, with signer: Signer) -> String {
         return "SIGNED(\(data.base64EncodedString()))"

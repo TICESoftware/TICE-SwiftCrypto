@@ -90,7 +90,7 @@ final class CryptoTests: XCTestCase {
         let claims = MembershipClaims(iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(-20), exp: Date().addingTimeInterval(-10), groupId: groupId, admin: true)
         var jwt = JWT(claims: claims)
 
-        let privateKeyData = user.certificatePrivateKey.pemString.data(using: .utf8)!
+        let privateKeyData = user.signingPrivateKey.pemString.data(using: .utf8)!
         let jwtSigner = JWTSigner.es512(privateKey: privateKeyData)
 
         guard let certificate = try? jwt.sign(using: jwtSigner) else {
@@ -115,7 +115,7 @@ final class CryptoTests: XCTestCase {
         let claims = MembershipClaims(iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(60), exp: Date().addingTimeInterval(3600), groupId: groupId, admin: true)
         var jwt = JWT(claims: claims)
 
-        let privateKeyData = user.certificatePrivateKey.pemString.data(using: .utf8)!
+        let privateKeyData = user.signingPrivateKey.pemString.data(using: .utf8)!
         let jwtSigner = JWTSigner.es512(privateKey: privateKeyData)
 
         guard let certificate = try? jwt.sign(using: jwtSigner) else {
@@ -175,12 +175,12 @@ final class CryptoTests: XCTestCase {
 }
 
 class TestUser: User, Signer {
-    let certificatePrivateKey: ECPrivateKey
+    let signingPrivateKey: ECPrivateKey
 
     init(userId: UserId) {
-        self.certificatePrivateKey = try! ECPrivateKey.make(for: .secp521r1)
+        self.signingPrivateKey = try! ECPrivateKey.make(for: .secp521r1)
 
-        let publicSigningKey = try! self.certificatePrivateKey.extractPublicKey()
+        let publicSigningKey = try! self.signingPrivateKey.extractPublicKey()
         super.init(userId: userId, publicKeys: UserPublicKeys(signingKey: publicSigningKey.pemString))
     }
 }
