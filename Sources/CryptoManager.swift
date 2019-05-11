@@ -149,12 +149,17 @@ public class CryptoManager {
     }
 
     public func initConversation(with userId: UserId, remotePrekeyBundle: PrekeyBundle, remoteVerificationKey: ECPublicKey) throws -> ConversationInvitation {
-        let x3dh = try X3DH()
-        let keyAgreementInitiation = try x3dh.initiateKeyAgreement(remotePrekeyBundle: remotePrekeyBundle, prekeySignatureVerifier: { verify(prekeySignature: $0, prekey: remotePrekeyBundle.signedPrekey, verificationPublicKey: remoteVerificationKey) }, info: info)
+        let keyAgreementInitiation = try handshake.initiateKeyAgreement(remotePrekeyBundle: remotePrekeyBundle, prekeySignatureVerifier: { verify(prekeySignature: $0, prekey: remotePrekeyBundle.signedPrekey, verificationPublicKey: remoteVerificationKey) }, info: info)
 
         doubleRatchets[userId] = try DoubleRatchet(keyPair: nil, remotePublicKey: remotePrekeyBundle.signedPrekey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
 
         return ConversationInvitation(identityKey: keyAgreementInitiation.identityPublicKey, ephemeralKey: keyAgreementInitiation.ephemeralPublicKey, usedOneTimePrekey: keyAgreementInitiation.usedOneTimePrekey)
+    }
+
+    public func processConversationInvitation(_ conversationInvitation: ConversationInvitation, from userId: UserId) throws {
+        let sharedSecret = try handshake.sharedSecretFromKeyAgreement(remoteIdentityPublicKey: conversationInvitation.identityKey, remoteEphemeralPublicKey: conversationInvitation.ephemeralKey, usedOneTimePrekey: conversationInvitation.usedOneTimePrekey, info: info)
+
+        doubleRatchets[userId] = try DoubleRatchet(keyPair: handshake.signedPrekeyPair, remotePublicKey: nil, sharedSecret: sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
     }
 
     public func encrypt<SettingsType: Encodable>(_ groupSettings: SettingsType) -> String {
