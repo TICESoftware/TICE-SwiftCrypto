@@ -15,6 +15,7 @@ public enum CryptoManagerError: LocalizedError {
     case couldNotAccessSignedInUser
     case missingMembershipCertificate(member: Member)
     case decryptionError
+    case conversationNotInitialized
     case serializationError(Error)
     case certificateValidationFailed(Error)
 
@@ -24,6 +25,7 @@ public enum CryptoManagerError: LocalizedError {
         case .couldNotAccessSignedInUser: return "could not access signed in user"
         case .missingMembershipCertificate(let member): return "Missing membership certificate for \(member)"
         case .decryptionError: return "Decryption error"
+        case .conversationNotInitialized: return "Conversation with user not initialized yet."
         case .serializationError(let error): return error.localizedDescription
         case .certificateValidationFailed(let error): return "Certificate validation failed. Reason: \(error.localizedDescription)"
         }
@@ -46,7 +48,6 @@ public enum CertificateValidationError: LocalizedError {
     }
 }
 
-public typealias Message = String
 public typealias Certificate = String
 
 public class CryptoManager {
@@ -196,8 +197,12 @@ public class CryptoManager {
         return data
     }
 
-    public func encrypt(message: Message, for member: Member) -> String {
-        return message
+    public func encrypt(message: String, for member: Member) throws -> Message {
+        guard let doubleRatchet = doubleRatchets[member.user.userId] else {
+            throw CryptoManagerError.conversationNotInitialized
+        }
+
+        return try doubleRatchet.encrypt(plaintext: message.bytes)
     }
 
     public func encrypt(_ payloadData: Data, for members: Set<Member>) throws -> (ciphertext: Data, recipients: Set<Recipient>) {
@@ -214,8 +219,10 @@ public class CryptoManager {
             }
 
             operationQueue.addOperation {
-                let encryptedMessageKey = self.encrypt(message: encryptionKey, for: member)
-                let recipient = Recipient(userId: member.user.userId, serverSignedMembershipCertificate: serverSignedMembershipCertificate, encryptedMessageKey: encryptedMessageKey)
+                guard let encryptedMessageKey = try? self.encrypt(message: encryptionKey, for: member) else {
+                    return
+                }
+                let recipient = Recipient(userId: member.user.userId, serverSignedMembershipCertificate: serverSignedMembershipCertificate, encryptedMessageKey: encryptedMessageKey as! String)
 
                 _ = insertRecipientQueue.sync {
                     recipients.insert(recipient)
@@ -228,8 +235,12 @@ public class CryptoManager {
         return (ciphertext: encryptedMessage, recipients: recipients)
     }
 
-    public func decrypt(encryptedMessageKey: String, with signer: Signer) -> String {
-        return encryptedMessageKey
+    public func decrypt(encryptedMessageKey: Message, from userId: UserId, with signer: Signer) throws -> Bytes {
+        guard let doubleRatchet = doubleRatchets[userId] else {
+            throw CryptoManagerError.conversationNotInitialized
+        }
+
+        return try doubleRatchet.decrypt(message: encryptedMessageKey)
     }
 
     public func decrypt(encryptedPayload: Data, using key: String) throws -> PayloadContainer {
