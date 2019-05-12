@@ -14,6 +14,7 @@ public enum CryptoManagerError: LocalizedError {
     case invalidMessageSignature
     case couldNotAccessSignedInUser
     case missingMembershipCertificate(member: Member)
+    case encryptionError
     case decryptionError
     case conversationNotInitialized
     case serializationError(Error)
@@ -24,7 +25,8 @@ public enum CryptoManagerError: LocalizedError {
         case .invalidMessageSignature: return "Invalid message signature"
         case .couldNotAccessSignedInUser: return "could not access signed in user"
         case .missingMembershipCertificate(let member): return "Missing membership certificate for \(member)"
-        case .decryptionError: return "Decryption error"
+        case .encryptionError: return "Encryption failed"
+        case .decryptionError: return "Decryption failed"
         case .conversationNotInitialized: return "Conversation with user not initialized yet."
         case .serializationError(let error): return error.localizedDescription
         case .certificateValidationFailed(let error): return "Certificate validation failed. Reason: \(error.localizedDescription)"
@@ -48,9 +50,13 @@ public enum CertificateValidationError: LocalizedError {
     }
 }
 
+typealias SecretKey = Bytes
+typealias Ciphertext = Bytes
 public typealias Certificate = String
 
 public class CryptoManager {
+
+    let sodium = Sodium()
 
     let info = "Let's Meet"
     let maxSkip = 100
@@ -143,9 +149,9 @@ public class CryptoManager {
         return "tokenKey\(groupKey.hashValue)\(user.publicKeys.hashValue)"
     }
 
-    // MARK: Encryption / Decryption
+    // MARK: Handshake
 
-    public func createPublicKeyMaterial(signer: Signer) throws -> PublicKeyMaterial {
+    public func generatePublicHandshakeInfo(signer: Signer) throws -> PublicKeyMaterial {
         return try handshake.createPrekeyBundle(oneTimePrekeysCount: 10, renewSignedPrekey: false, prekeySigner: { try sign(prekey: $0, with: signer) })
     }
 
@@ -162,6 +168,8 @@ public class CryptoManager {
 
         doubleRatchets[userId] = try DoubleRatchet(keyPair: handshake.signedPrekeyPair, remotePublicKey: nil, sharedSecret: sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
     }
+
+    // MARK: Encryption / Decryption
 
     public func encrypt<SettingsType: Encodable>(_ groupSettings: SettingsType) -> String {
         // swiftlint:disable:next force_try
@@ -189,25 +197,28 @@ public class CryptoManager {
         return parentEncryptedGroupKey
     }
 
-    private func generateEncryptionKey() -> String {
-        return "encryptionKey"
+    private func encrypt(_ data: Data, secretKey: SecretKey) throws -> Ciphertext {
+        guard let cipher: Ciphertext = sodium.aead.xchacha20poly1305ietf.encrypt(message: Bytes(data), secretKey: secretKey) else {
+            throw CryptoManagerError.encryptionError
+        }
+        return cipher
     }
 
-    private func encrypt(_ data: Data, encryptionKey: String) -> Data {
-        return data
+    private func encrypt(secretKey: SecretKey, for user: User) throws -> Message {
+        return try encrypt(Data(secretKey), for: user)
     }
 
-    public func encrypt(message: String, for member: Member) throws -> Message {
-        guard let doubleRatchet = doubleRatchets[member.user.userId] else {
+    public func encrypt(_ data: Data, for user: User) throws -> Message {
+        guard let doubleRatchet = doubleRatchets[user.userId] else {
             throw CryptoManagerError.conversationNotInitialized
         }
 
-        return try doubleRatchet.encrypt(plaintext: message.bytes)
+        return try doubleRatchet.encrypt(plaintext: Bytes(data))
     }
 
     public func encrypt(_ payloadData: Data, for members: Set<Member>) throws -> (ciphertext: Data, recipients: Set<Recipient>) {
-        let encryptionKey = generateEncryptionKey()
-        let encryptedMessage = encrypt(payloadData, encryptionKey: encryptionKey)
+        let secretKey = sodium.aead.xchacha20poly1305ietf.key()
+        let encryptedMessage = try encrypt(payloadData, secretKey: secretKey)
 
         var recipients = Set<Recipient>()
         let operationQueue = OperationQueue()
@@ -219,10 +230,11 @@ public class CryptoManager {
             }
 
             operationQueue.addOperation {
-                guard let encryptedMessageKey = try? self.encrypt(message: encryptionKey, for: member) else {
+                guard let encryptedMessageKey = try? self.encrypt(secretKey: secretKey, for: member.user),
+                    let encryptedMessageKeyData = try? self.encoder.encode(encryptedMessageKey) else {
                     return
                 }
-                let recipient = Recipient(userId: member.user.userId, serverSignedMembershipCertificate: serverSignedMembershipCertificate, encryptedMessageKey: encryptedMessageKey as! String)
+                let recipient = Recipient(userId: member.user.userId, serverSignedMembershipCertificate: serverSignedMembershipCertificate, encryptedMessageKey: encryptedMessageKeyData)
 
                 _ = insertRecipientQueue.sync {
                     recipients.insert(recipient)
@@ -232,19 +244,35 @@ public class CryptoManager {
 
         operationQueue.waitUntilAllOperationsAreFinished()
 
-        return (ciphertext: encryptedMessage, recipients: recipients)
+        guard recipients.count == members.count else {
+            throw CryptoManagerError.encryptionError
+        }
+
+        return (ciphertext: Data(encryptedMessage), recipients: recipients)
     }
 
-    public func decrypt(encryptedMessageKey: Message, from userId: UserId, with signer: Signer) throws -> Bytes {
+    private func decrypt(encryptedSecretKey: Data, from userId: UserId, with signer: Signer) throws -> SecretKey {
+        let encryptedMessageKey = try decoder.decode(Message.self, from: encryptedSecretKey)
+        let messageKeyData = try decrypt(encryptedMessage: encryptedMessageKey, from: userId, with: signer)
+        return SecretKey(messageKeyData)
+    }
+
+    public func decrypt(encryptedMessage: Message, from userId: UserId, with signer: Signer) throws -> Data {
         guard let doubleRatchet = doubleRatchets[userId] else {
             throw CryptoManagerError.conversationNotInitialized
         }
 
-        return try doubleRatchet.decrypt(message: encryptedMessageKey)
+        let plaintext = try doubleRatchet.decrypt(message: encryptedMessage)
+        return Data(plaintext)
     }
 
-    public func decrypt(encryptedPayload: Data, using key: String) throws -> PayloadContainer {
-        return try decoder.decode(PayloadContainer.self, from: encryptedPayload)
+    public func decrypt(encryptedData: Data, encryptedSecretKey: Data, from userId: UserId, signer: Signer) throws -> Data {
+        let secretKey = try decrypt(encryptedSecretKey: encryptedSecretKey, from: userId, with: signer)
+        guard let plaintext = sodium.aead.xchacha20poly1305ietf.decrypt(nonceAndAuthenticatedCipherText: Bytes(encryptedData), secretKey: secretKey) else {
+            throw CryptoManagerError.decryptionError
+        }
+
+        return Data(plaintext)
     }
 
     // MARK: Sign / verify

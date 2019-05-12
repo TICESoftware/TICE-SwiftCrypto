@@ -14,7 +14,7 @@ let package = Package(
             targets: ["LetsMeetCrypto"]),
     ],
     dependencies: [
-        .package(url: "git@github.com:AnbionApps/letsmeet-models.git", from: "7.0.0"),
+        .package(url: "git@github.com:AnbionApps/letsmeet-models.git", .branch("crypto")),//from: "7.0.0"),
         .package(url: "https://github.com/IBM-Swift/Swift-JWT.git", from: "3.4.1"),
         .package(url: "https://github.com/IBM-Swift/BlueECC.git", from: "1.2.1"),
         .package(url: "git@github.com:AnbionApps/X3DH.git", .branch("develop")),
@@ -27,6 +27,6 @@ let package = Package(
             path: "Sources"),
         .testTarget(
             name: "LetsMeetCryptoTests",
-            dependencies: ["LetsMeetCrypto", "LetsMeetModels", "SwiftJWT", "CryptorECC"]),
+            dependencies: ["LetsMeetCrypto", "LetsMeetModels", "SwiftJWT", "CryptorECC", "DoubleRatchet"]),
     ]
 )

@@ -1,12 +1,14 @@
 import XCTest
 import SwiftJWT
 import CryptorECC
+import Sodium
+import DoubleRatchet
 @testable import LetsMeetModels
 @testable import LetsMeetCrypto
 
 final class CryptoTests: XCTestCase {
 
-    let cryptoManager = CryptoManager(encoder: JSONEncoder(), decoder: JSONDecoder())
+    let cryptoManager = try! CryptoManager(handshake: nil, encoder: JSONEncoder(), decoder: JSONDecoder())
     let groupId = UUID(uuidString: "E621E1F8-C36C-495A-93FC-0C247A3E6E5F")!
     let userId = UUID(uuidString: "F621E1F8-C36C-495A-93FC-0C247A3E6E5F")!
 
@@ -164,6 +166,65 @@ final class CryptoTests: XCTestCase {
         }
     }
 
+    func testInitializeConversation() {
+        do {
+            var publicKeyMaterial = try cryptoManager.generatePublicHandshakeInfo(signer: user)
+
+            // Publish public key material...
+
+            let bob = TestUser(userId: UserId())
+            let bobsCryptoManager = try CryptoManager(handshake: nil, encoder: JSONEncoder(), decoder: JSONDecoder())
+
+            // Bob gets prekey bundle and remote verification key from server
+            let prekeyBundle = publicKeyMaterial.prekeyBundle()
+            let remoteVerificationKey = try ECPublicKey(key: user.publicKeys.signingKey)
+
+            let invitation = try bobsCryptoManager.initConversation(with: userId, remotePrekeyBundle: prekeyBundle, remoteVerificationKey: remoteVerificationKey)
+
+            // Invitation is transmitted...
+
+            try cryptoManager.processConversationInvitation(invitation, from: bob.userId)
+
+            let firstMessagePayload = "Hello!".data(using: .utf8)!
+            let firstMessage = try bobsCryptoManager.encrypt(firstMessagePayload, for: user)
+
+            let plaintextData = try cryptoManager.decrypt(encryptedMessage: firstMessage, from: bob.userId, with: user)
+
+            XCTAssertEqual(firstMessagePayload, plaintextData, "Invalid decrypted plaintext")
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
+    func testGroupMessageCrypto() {
+        let bob = TestUser(userId: UserId())
+        let bobServerSignedMembershipCertificate = "Certificate"
+        let bobMembership = Membership(userId: bob.userId, groupId: GroupId(), admin: false, serverSignedMembershipCertificate: bobServerSignedMembershipCertificate)
+        let bobMember = Member(user: bob, membership: bobMembership)
+
+        let sharedSecret = Bytes(repeating: 0, count: 32)
+        let info = "testGroupMessageCrypto"
+        do {
+            let bobDoubleRatchet = try DoubleRatchet(keyPair: nil, remotePublicKey: nil, sharedSecret: sharedSecret, maxSkip: 2, maxCache: 2, info: info)
+            let doubleRatchetWithBob = try DoubleRatchet(keyPair: nil, remotePublicKey: bobDoubleRatchet.publicKey, sharedSecret: sharedSecret, maxSkip: 2, maxCache: 2, info: info)
+            cryptoManager.doubleRatchets[bob.userId] = doubleRatchetWithBob
+
+            let payloadData = "Hello!".data(using: .utf8)!
+            let (ciphertext, recipients) = try cryptoManager.encrypt(payloadData, for: Set([bobMember]))
+
+            XCTAssertEqual(recipients.count, 1, "Invalid recipients")
+            XCTAssertEqual(recipients.first!.userId, bob.userId)
+
+            let bobsCryptoManager = try CryptoManager(handshake: nil, encoder: JSONEncoder(), decoder: JSONDecoder())
+            bobsCryptoManager.doubleRatchets[userId] = bobDoubleRatchet
+            let plaintext = try bobsCryptoManager.decrypt(encryptedData: ciphertext, encryptedSecretKey: recipients.first!.encryptedMessageKey, from: userId, signer: bob)
+
+            XCTAssertEqual(payloadData, plaintext, "Invalid decrypted plaintext")
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+    }
+
     static var allTests = [
         ("testUserSignedMembershipCertificate", testUserSignedMembershipCertificate),
         ("testServerSignedMembershipCertificate", testServerSignedMembershipCertificate),
@@ -171,6 +232,7 @@ final class CryptoTests: XCTestCase {
         ("testValidateExpiredCertificate", testValidateExpiredCertificate),
         ("testValidateCertificateIssuedInFuture", testValidateCertificateIssuedInFuture),
         ("testValidateCertificateInvalidSignature", testValidateCertificateInvalidSignature),
+        ("testInitializeConversation", testInitializeConversation),
     ]
 }
 
