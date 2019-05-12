@@ -17,6 +17,7 @@ public enum CryptoManagerError: LocalizedError {
     case encryptionError
     case decryptionError
     case conversationNotInitialized
+    case tokenGenerationFailed
     case serializationError(Error)
     case certificateValidationFailed(Error)
 
@@ -28,6 +29,7 @@ public enum CryptoManagerError: LocalizedError {
         case .encryptionError: return "Encryption failed"
         case .decryptionError: return "Decryption failed"
         case .conversationNotInitialized: return "Conversation with user not initialized yet."
+        case .tokenGenerationFailed: return "Could not generate token."
         case .serializationError(let error): return error.localizedDescription
         case .certificateValidationFailed(let error): return "Certificate validation failed. Reason: \(error.localizedDescription)"
         }
@@ -50,9 +52,9 @@ public enum CertificateValidationError: LocalizedError {
     }
 }
 
-typealias SecretKey = Bytes
-typealias Ciphertext = Bytes
+public typealias SecretKey = Bytes
 public typealias Certificate = String
+typealias Ciphertext = Bytes
 
 public class CryptoManager {
 
@@ -63,11 +65,10 @@ public class CryptoManager {
     let maxCache = 100
 
     let handshake: X3DH
+    var doubleRatchets: [UserId: DoubleRatchet] = [:]
 
     let encoder: JSONEncoder
     let decoder: JSONDecoder
-
-    var doubleRatchets: [UserId: DoubleRatchet] = [:]
 
     public init(handshake: X3DH?, encoder: JSONEncoder, decoder: JSONDecoder) throws {
         self.handshake = try handshake ?? X3DH()
@@ -83,14 +84,8 @@ public class CryptoManager {
         return UserKeyPairs(signingKeys: (privateKey: privateSigningKey, publicKey: publicSigningKey))
     }
 
-    public func generateGroupKey() -> String {
-        return "groupKey"
-    }
-
-    // MARK: Hashing
-
-    public func hash(_ group: Team) -> String {
-        return String(group.groupId.hashValue &+ group.members.hashValue &+ group.meetups.hashValue &+ group.settings.hashValue)
+    public func generateGroupKey() -> SecretKey {
+        return sodium.aead.xchacha20poly1305ietf.key()
     }
 
     // MARK: Membership certificates
@@ -145,8 +140,11 @@ public class CryptoManager {
         }
     }
 
-    public func tokenKeyForGroupWith(groupKey: String, user: UserProtocol) -> String {
-        return "tokenKey\(groupKey.hashValue)\(user.publicKeys.hashValue)"
+    public func tokenKeyForGroupWith(groupKey: SecretKey, user: UserProtocol) throws -> String {
+        guard let token = sodium.randomBytes.buf(length: 32) else {
+            throw CryptoManagerError.tokenGenerationFailed
+        }
+        return Data(token).base64EncodedString()
     }
 
     // MARK: Handshake
@@ -171,32 +169,6 @@ public class CryptoManager {
 
     // MARK: Encryption / Decryption
 
-    public func encrypt<SettingsType: Encodable>(_ groupSettings: SettingsType) -> String {
-        // swiftlint:disable:next force_try
-        let encoded = try! encoder.encode(groupSettings)
-        return String(data: encoded, encoding: .utf8)!
-    }
-
-    public func decrypt<SettingsType: Decodable>(encryptedSettings: Data, using groupKey: String) throws -> SettingsType {
-        return try decoder.decode(SettingsType.self, from: encryptedSettings)
-    }
-
-    public func encrypt(membership: Membership, using groupKey: String) -> Membership {
-        return membership
-    }
-
-    public func decrypt(encryptedMemberships: [Membership], using groupKey: String) -> Set<Membership> {
-        return Set<Membership>(encryptedMemberships)
-    }
-
-    public func encrypt(groupKey: String, withParentGroupKey: String) -> String {
-        return groupKey
-    }
-
-    public func decrypt(parentEncryptedGroupKey: String, using groupKey: String) throws -> String {
-        return parentEncryptedGroupKey
-    }
-
     private func encrypt(_ data: Data, secretKey: SecretKey) throws -> Ciphertext {
         guard let cipher: Ciphertext = sodium.aead.xchacha20poly1305ietf.encrypt(message: Bytes(data), secretKey: secretKey) else {
             throw CryptoManagerError.encryptionError
@@ -204,8 +176,11 @@ public class CryptoManager {
         return cipher
     }
 
-    private func encrypt(secretKey: SecretKey, for user: User) throws -> Message {
-        return try encrypt(Data(secretKey), for: user)
+    private func decrypt(encryptedData: Data, secretKey: SecretKey) throws -> Bytes {
+        guard let plaintext = sodium.aead.xchacha20poly1305ietf.decrypt(nonceAndAuthenticatedCipherText: Bytes(encryptedData), secretKey: secretKey) else {
+            throw CryptoManagerError.decryptionError
+        }
+        return plaintext
     }
 
     public func encrypt(_ data: Data, for user: User) throws -> Message {
@@ -230,7 +205,7 @@ public class CryptoManager {
             }
 
             operationQueue.addOperation {
-                guard let encryptedMessageKey = try? self.encrypt(secretKey: secretKey, for: member.user),
+                guard let encryptedMessageKey = try? self.encrypt(Data(secretKey), for: member.user),
                     let encryptedMessageKeyData = try? self.encoder.encode(encryptedMessageKey) else {
                     return
                 }
@@ -268,9 +243,7 @@ public class CryptoManager {
 
     public func decrypt(encryptedData: Data, encryptedSecretKey: Data, from userId: UserId, signer: Signer) throws -> Data {
         let secretKey = try decrypt(encryptedSecretKey: encryptedSecretKey, from: userId, with: signer)
-        guard let plaintext = sodium.aead.xchacha20poly1305ietf.decrypt(nonceAndAuthenticatedCipherText: Bytes(encryptedData), secretKey: secretKey) else {
-            throw CryptoManagerError.decryptionError
-        }
+        let plaintext = try decrypt(encryptedData: encryptedData, secretKey: secretKey)
 
         return Data(plaintext)
     }
@@ -286,22 +259,5 @@ public class CryptoManager {
     private func verify(prekeySignature: Signatur, prekey: PublicKey, verificationPublicKey: ECPublicKey) -> Bool {
         guard let sig = try? ECSignature(asn1: prekeySignature) else { return false }
         return sig.verify(plaintext: Data(prekey), using: verificationPublicKey)
-    }
-
-    public func sign(_ data: Data, with signer: Signer) -> String {
-        return "SIGNED(\(data.base64EncodedString()))"
-    }
-
-    public func sign<T: Encodable>(object: T, with signer: Signer) throws -> String {
-        let data = try encoder.encode(object)
-        return sign(data, with: signer)
-    }
-
-    public func verify(_ signature: String) -> Bool {
-        return true
-    }
-
-    public func verify(_ signature: String, with member: Member) -> Bool {
-        return true
     }
 }
