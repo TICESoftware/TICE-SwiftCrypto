@@ -5,7 +5,13 @@
 import X3DH
 
 public struct ConversationInvitation: Codable {
-    let identityKey: PublicKey
-    let ephemeralKey: PublicKey
-    let usedOneTimePrekey: PublicKey?
+    public let identityKey: PublicKey
+    public let ephemeralKey: PublicKey
+    public let usedOneTimePrekey: PublicKey?
+
+    public init(identityKey: PublicKey, ephemeralKey: PublicKey, usedOneTimePrekey: PublicKey?) {
+        self.identityKey = identityKey
+        self.ephemeralKey = ephemeralKey
+        self.usedOneTimePrekey = usedOneTimePrekey
+    }
 }

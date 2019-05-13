@@ -30,15 +30,18 @@ final class CryptoTests: XCTestCase {
 
     func testServerSignedMembershipCertificate() {
         let signingPrivateKey = try! ECPrivateKey.make(for: .secp521r1)
-        let signingPublicKey = try! signingPrivateKey.extractPublicKey()
+        let signingPrivateKeyBytes = signingPrivateKey.pemString.bytes
 
-        guard let certificate = try? cryptoManager.createServerSignedMembershipCertificate(userId: userId, groupId: groupId, admin: true, signingKey: signingPrivateKey) else {
+        let signingPublicKey = try! signingPrivateKey.extractPublicKey()
+        let signingPublicKeyBytes = signingPublicKey.pemString.bytes
+
+        guard let certificate = try? cryptoManager.createServerSignedMembershipCertificate(userId: userId, groupId: groupId, admin: true, signingKey: signingPrivateKeyBytes) else {
             XCTFail("Could not create certificate.")
             return
         }
 
         do {
-            try cryptoManager.validateServerSignedMembershipCertificate(certificate: certificate, membership: membership, publicKey: signingPublicKey.pemString)
+            try cryptoManager.validateServerSignedMembershipCertificate(certificate: certificate, membership: membership, publicKey: signingPublicKeyBytes)
         } catch {
             XCTFail(error.localizedDescription)
         }
@@ -92,7 +95,7 @@ final class CryptoTests: XCTestCase {
         let claims = MembershipClaims(iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(-20), exp: Date().addingTimeInterval(-10), groupId: groupId, admin: true)
         var jwt = JWT(claims: claims)
 
-        let privateKeyData = user.signingPrivateKey.pemString.data(using: .utf8)!
+        let privateKeyData = Data(user.privateSigningKey)
         let jwtSigner = JWTSigner.es512(privateKey: privateKeyData)
 
         guard let certificate = try? jwt.sign(using: jwtSigner) else {
@@ -117,7 +120,7 @@ final class CryptoTests: XCTestCase {
         let claims = MembershipClaims(iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(60), exp: Date().addingTimeInterval(3600), groupId: groupId, admin: true)
         var jwt = JWT(claims: claims)
 
-        let privateKeyData = user.signingPrivateKey.pemString.data(using: .utf8)!
+        let privateKeyData = Data(user.privateSigningKey)
         let jwtSigner = JWTSigner.es512(privateKey: privateKeyData)
 
         guard let certificate = try? jwt.sign(using: jwtSigner) else {
@@ -177,9 +180,7 @@ final class CryptoTests: XCTestCase {
 
             // Bob gets prekey bundle and remote verification key from server
             let prekeyBundle = publicKeyMaterial.prekeyBundle()
-            let remoteVerificationKey = try ECPublicKey(key: user.publicKeys.signingKey)
-
-            let invitation = try bobsCryptoManager.initConversation(with: userId, remotePrekeyBundle: prekeyBundle, remoteVerificationKey: remoteVerificationKey)
+            let invitation = try bobsCryptoManager.initConversation(with: userId, remotePrekeyBundle: prekeyBundle, remoteVerificationKey: user.publicSigningKey)
 
             // Invitation is transmitted...
 
@@ -237,12 +238,13 @@ final class CryptoTests: XCTestCase {
 }
 
 class TestUser: User, Signer {
-    let signingPrivateKey: ECPrivateKey
+    let privateSigningKey: PrivateKey
 
     init(userId: UserId) {
-        self.signingPrivateKey = try! ECPrivateKey.make(for: .secp521r1)
+        let signingKey = try! ECPrivateKey.make(for: .secp521r1)
+        self.privateSigningKey = signingKey.pemString.bytes
 
-        let publicSigningKey = try! self.signingPrivateKey.extractPublicKey()
-        super.init(userId: userId, publicKeys: UserPublicKeys(signingKey: publicSigningKey.pemString))
+        let publicSigningKey = try! signingKey.extractPublicKey().pemString.bytes
+        super.init(userId: userId, publicSigningKey: publicSigningKey)
     }
 }

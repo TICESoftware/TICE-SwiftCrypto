@@ -6,5 +6,11 @@ import CryptorECC
 import LetsMeetModels
 
 public protocol Signer: User {
-    var signingPrivateKey: ECPrivateKey { get }
+    var privateSigningKey: PrivateKey { get }
+}
+
+extension SignedInUser: Signer {
+    public var privateSigningKey: PrivateKey {
+        return keyPairs.signingKeyPair.privateKey
+    }
 }

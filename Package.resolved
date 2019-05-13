@@ -68,9 +68,9 @@
         "package": "LetsMeetModels",
         "repositoryURL": "git@github.com:AnbionApps/letsmeet-models.git",
         "state": {
-          "branch": null,
-          "revision": "e394e6131873e86ecc066f3193cee83628f57b2d",
-          "version": "8.0.0"
+          "branch": "applyCrypto",
+          "revision": "95f92d451dc0c5f5593aba2de27383395134eff7",
+          "version": null
         }
       },
       {
@@ -105,8 +105,8 @@
         "repositoryURL": "git@github.com:AnbionApps/X3DH.git",
         "state": {
           "branch": null,
-          "revision": "3cffbd1a66397da48a1dbd8e9feed0d60e9be889",
-          "version": "1.0.1"
+          "revision": "f246d122f493c6bcfa759a3dc59c6ee95b9df07d",
+          "version": "1.0.2"
         }
       }
     ]

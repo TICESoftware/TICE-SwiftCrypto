@@ -19,6 +19,7 @@ public enum CryptoManagerError: LocalizedError {
     case decryptionError
     case conversationNotInitialized
     case tokenGenerationFailed
+    case invalidKey
     case serializationError(Error)
     case certificateValidationFailed(Error)
 
@@ -31,6 +32,7 @@ public enum CryptoManagerError: LocalizedError {
         case .decryptionError: return "Decryption failed"
         case .conversationNotInitialized: return "Conversation with user not initialized yet."
         case .tokenGenerationFailed: return "Could not generate token."
+        case .invalidKey: return "Invalid key"
         case .serializationError(let error): return error.localizedDescription
         case .certificateValidationFailed(let error): return "Certificate validation failed. Reason: \(error.localizedDescription)"
         }
@@ -55,7 +57,7 @@ public enum CertificateValidationError: LocalizedError {
 
 public typealias SecretKey = Bytes
 public typealias Certificate = String
-typealias Ciphertext = Bytes
+public typealias Ciphertext = Bytes
 
 public class CryptoManager {
 
@@ -77,12 +79,15 @@ public class CryptoManager {
         self.decoder = decoder
     }
 
-    public func generateKeys() throws -> UserKeyPairs {
+    public func generateSigningKeyPair() throws -> (privateKey: PrivateKey, publicKey: PublicKey) {
 
         let privateSigningKey = try ECPrivateKey.make(for: .secp521r1)
-        let publicSigningKey = try privateSigningKey.extractPublicKey()
+        let publicVerificationKey = try privateSigningKey.extractPublicKey()
 
-        return UserKeyPairs(signingKeys: (privateKey: privateSigningKey, publicKey: publicSigningKey))
+        let privateKeyBytes = privateSigningKey.pemString.bytes
+        let publicKeyBytes = publicVerificationKey.pemString.bytes
+
+        return (privateKey: privateKeyBytes, publicKey: publicKeyBytes)
     }
 
     public func generateGroupKey() -> SecretKey {
@@ -92,35 +97,35 @@ public class CryptoManager {
     // MARK: Membership certificates
 
     public func createUserSignedMembershipCertificate(userId: UserId, groupId: GroupId, admin: Bool, signer: Signer) throws -> Certificate {
-        return try createMembershipCertificate(userId: userId, groupId: groupId, admin: admin, issuer: .user(signer.userId), signingKey: signer.signingPrivateKey)
+        return try createMembershipCertificate(userId: userId, groupId: groupId, admin: admin, issuer: .user(signer.userId), signingKey: signer.privateSigningKey)
     }
 
-    public func createServerSignedMembershipCertificate(userId: UserId, groupId: GroupId, admin: Bool, signingKey: ECPrivateKey) throws -> Certificate {
+    public func createServerSignedMembershipCertificate(userId: UserId, groupId: GroupId, admin: Bool, signingKey: PrivateKey) throws -> Certificate {
         return try createMembershipCertificate(userId: userId, groupId: groupId, admin: admin, issuer: .server, signingKey: signingKey)
     }
 
-    private func createMembershipCertificate(userId: UserId, groupId: GroupId, admin: Bool, issuer: MembershipClaims.Issuer, signingKey: ECPrivateKey) throws -> Certificate {
+    private func createMembershipCertificate(userId: UserId, groupId: GroupId, admin: Bool, issuer: MembershipClaims.Issuer, signingKey: PrivateKey) throws -> Certificate {
         let issueDate = Date()
 
         let claims = MembershipClaims(iss: issuer, sub: userId, iat: issueDate, exp: issueDate.addingTimeInterval(3600), groupId: groupId, admin: admin)
         var jwt = JWT(claims: claims)
 
-        let privateKeyData = signingKey.pemString.data(using: .utf8)!
+        let privateKeyData = Data(signingKey)
         let jwtSigner = JWTSigner.es512(privateKey: privateKeyData)
 
         return try jwt.sign(using: jwtSigner)
     }
 
     public func validateUserSignedMembershipCertificate(certificate: Certificate, membership: Membership, issuer: User) throws {
-        try validate(certificate: certificate, membership: membership, issuer: .user(issuer.userId), publicKey: issuer.publicKeys.signingKey)
+        try validate(certificate: certificate, membership: membership, issuer: .user(issuer.userId), publicKey: issuer.publicSigningKey)
     }
 
-    public func validateServerSignedMembershipCertificate(certificate: Certificate, membership: Membership, publicKey: String) throws {
+    public func validateServerSignedMembershipCertificate(certificate: Certificate, membership: Membership, publicKey: PublicKey) throws {
         try validate(certificate: certificate, membership: membership, issuer: .server, publicKey: publicKey)
     }
 
-    private func validate(certificate: Certificate, membership: Membership, issuer: MembershipClaims.Issuer, publicKey: String) throws {
-        let publicKeyData = publicKey.data(using: .utf8)!
+    private func validate(certificate: Certificate, membership: Membership, issuer: MembershipClaims.Issuer, publicKey: PublicKey) throws {
+        let publicKeyData = Data(publicKey)
         let jwtVerifier = JWTVerifier.es512(publicKey: publicKeyData)
 
         let jwt = try JWT<MembershipClaims>(jwtString: certificate)
@@ -142,10 +147,9 @@ public class CryptoManager {
     }
 
     public func tokenKeyForGroupWith(groupKey: SecretKey, user: UserProtocol) throws -> SecretKey {
-        let publicVerificationKey = user.publicKeys.signingKey.data(using: .utf8)!
         var inputKeyingMaterial = Bytes()
         inputKeyingMaterial.append(contentsOf: groupKey)
-        inputKeyingMaterial.append(contentsOf: Bytes(publicVerificationKey))
+        inputKeyingMaterial.append(contentsOf: user.publicSigningKey)
 
         return try deriveHKDFKey(ikm: inputKeyingMaterial, L: 32)
     }
@@ -156,7 +160,12 @@ public class CryptoManager {
         return try handshake.createPrekeyBundle(oneTimePrekeysCount: 10, renewSignedPrekey: false, prekeySigner: { try sign(prekey: $0, with: signer) })
     }
 
-    public func initConversation(with userId: UserId, remotePrekeyBundle: PrekeyBundle, remoteVerificationKey: ECPublicKey) throws -> ConversationInvitation {
+    public func initConversation(with userId: UserId, remotePrekeyBundle: PrekeyBundle, remoteVerificationKey: PublicKey) throws -> ConversationInvitation {
+        guard let remoteVerificationKeyPemString = remoteVerificationKey.utf8String,
+            let remoteVerificationKey = try? ECPublicKey(key: remoteVerificationKeyPemString) else {
+                throw CryptoManagerError.invalidKey
+        }
+
         let keyAgreementInitiation = try handshake.initiateKeyAgreement(remotePrekeyBundle: remotePrekeyBundle, prekeySignatureVerifier: { verify(prekeySignature: $0, prekey: remotePrekeyBundle.signedPrekey, verificationPublicKey: remoteVerificationKey) }, info: info)
 
         doubleRatchets[userId] = try DoubleRatchet(keyPair: nil, remotePublicKey: remotePrekeyBundle.signedPrekey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
@@ -172,18 +181,18 @@ public class CryptoManager {
 
     // MARK: Encryption / Decryption
 
-    private func encrypt(_ data: Data, secretKey: SecretKey) throws -> Ciphertext {
+    public func encrypt(_ data: Data, secretKey: SecretKey) throws -> Ciphertext {
         guard let cipher: Ciphertext = sodium.aead.xchacha20poly1305ietf.encrypt(message: Bytes(data), secretKey: secretKey) else {
             throw CryptoManagerError.encryptionError
         }
         return cipher
     }
 
-    private func decrypt(encryptedData: Data, secretKey: SecretKey) throws -> Bytes {
+    public func decrypt(encryptedData: Data, secretKey: SecretKey) throws -> Data {
         guard let plaintext = sodium.aead.xchacha20poly1305ietf.decrypt(nonceAndAuthenticatedCipherText: Bytes(encryptedData), secretKey: secretKey) else {
             throw CryptoManagerError.decryptionError
         }
-        return plaintext
+        return Data(plaintext)
     }
 
     public func encrypt(_ data: Data, for user: User) throws -> Message {
@@ -248,14 +257,18 @@ public class CryptoManager {
         let secretKey = try decrypt(encryptedSecretKey: encryptedSecretKey, from: userId, with: signer)
         let plaintext = try decrypt(encryptedData: encryptedData, secretKey: secretKey)
 
-        return Data(plaintext)
+        return plaintext
     }
 
     // MARK: Sign / verify
 
     private func sign(prekey: PublicKey, with signer: Signer) throws -> Signatur {
         let publicKeyData = Data(prekey)
-        let sig = try publicKeyData.sign(with: signer.signingPrivateKey)
+        guard let privateKeyString = signer.privateSigningKey.utf8String else {
+            throw CryptoManagerError.invalidKey
+        }
+        let signingKey = try ECPrivateKey(key: privateKeyString)
+        let sig = try publicKeyData.sign(with: signingKey)
         return sig.asn1
     }
 
