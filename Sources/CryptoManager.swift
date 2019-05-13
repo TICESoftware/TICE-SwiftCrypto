@@ -9,6 +9,7 @@ import CryptorECC
 import X3DH
 import DoubleRatchet
 import Sodium
+import HKDF
 
 public enum CryptoManagerError: LocalizedError {
     case invalidMessageSignature
@@ -140,11 +141,13 @@ public class CryptoManager {
         }
     }
 
-    public func tokenKeyForGroupWith(groupKey: SecretKey, user: UserProtocol) throws -> String {
-        guard let token = sodium.randomBytes.buf(length: 32) else {
-            throw CryptoManagerError.tokenGenerationFailed
-        }
-        return Data(token).base64EncodedString()
+    public func tokenKeyForGroupWith(groupKey: SecretKey, user: UserProtocol) throws -> SecretKey {
+        let publicVerificationKey = user.publicKeys.signingKey.data(using: .utf8)!
+        var inputKeyingMaterial = Bytes()
+        inputKeyingMaterial.append(contentsOf: groupKey)
+        inputKeyingMaterial.append(contentsOf: Bytes(publicVerificationKey))
+
+        return try deriveHKDFKey(ikm: inputKeyingMaterial, L: 32)
     }
 
     // MARK: Handshake
