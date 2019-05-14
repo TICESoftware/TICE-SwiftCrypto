@@ -155,15 +155,16 @@ public class CryptoManager {
         return UserPublicKeys(signingKey: signer.privateSigningKey, identityKey: Data(publicKeyMaterial.identityKey), signedPrekey: Data(publicKeyMaterial.signedPrekey), prekeySignature: publicKeyMaterial.prekeySignature, oneTimePrekeys: publicKeyMaterial.oneTimePrekeys.map { Data($0) })
     }
 
-    public func initConversation(with userId: UserId, remotePrekeyBundle: PrekeyBundle, remoteSigningKey: LetsMeetModels.PublicKey) throws -> ConversationInvitation {
+    public func initConversation(with userId: UserId, remoteIdentityKey: LetsMeetModels.PublicKey, remoteSignedPrekey: LetsMeetModels.PublicKey, remotePrekeySignature: Signature, remoteOneTimePrekey: LetsMeetModels.PublicKey?, remoteSigningKey: LetsMeetModels.PublicKey) throws -> ConversationInvitation {
+        let prekeyBundle = PrekeyBundle(identityKey: Bytes(remoteIdentityKey), signedPrekey: Bytes(remoteSignedPrekey), prekeySignature: remotePrekeySignature, oneTimePrekey: remoteOneTimePrekey.map { Bytes($0) })
         guard let remoteSigningKeyPemString = Bytes(remoteSigningKey).utf8String,
             let remoteSigningKey = try? ECPublicKey(key: remoteSigningKeyPemString) else {
                 throw CryptoManagerError.invalidKey
         }
 
-        let keyAgreementInitiation = try handshake.initiateKeyAgreement(remotePrekeyBundle: remotePrekeyBundle, prekeySignatureVerifier: { verify(prekeySignature: $0, prekey: Data(remotePrekeyBundle.signedPrekey), verificationPublicKey: remoteSigningKey) }, info: info)
+        let keyAgreementInitiation = try handshake.initiateKeyAgreement(remotePrekeyBundle: prekeyBundle, prekeySignatureVerifier: { verify(prekeySignature: $0, prekey: Data(prekeyBundle.signedPrekey), verificationPublicKey: remoteSigningKey) }, info: info)
 
-        doubleRatchets[userId] = try DoubleRatchet(keyPair: nil, remotePublicKey: remotePrekeyBundle.signedPrekey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
+        doubleRatchets[userId] = try DoubleRatchet(keyPair: nil, remotePublicKey: prekeyBundle.signedPrekey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
 
         return ConversationInvitation(identityKey: Data(keyAgreementInitiation.identityPublicKey), ephemeralKey: Data(keyAgreementInitiation.ephemeralPublicKey), usedOneTimePrekey: keyAgreementInitiation.usedOneTimePrekey.map { Data($0) })
     }
@@ -196,21 +197,22 @@ public class CryptoManager {
         return Data(plaintext)
     }
 
-    public func encrypt(_ data: Data, for userId: UserId) throws -> Message {
+    public func encrypt(_ data: Data, for userId: UserId) throws -> Ciphertext {
         guard let doubleRatchet = doubleRatchets[userId] else {
             throw CryptoManagerError.conversationNotInitialized
         }
 
-        return try doubleRatchet.encrypt(plaintext: Bytes(data))
+        let message = try doubleRatchet.encrypt(plaintext: Bytes(data))
+        return try encoder.encode(message)
     }
 
     private func decrypt(encryptedSecretKey: Ciphertext, from userId: UserId, with signer: Signer) throws -> SecretKey {
-        let encryptedMessageKey = try decoder.decode(Message.self, from: encryptedSecretKey)
-        let messageKeyData = try decrypt(encryptedMessage: encryptedMessageKey, from: userId, with: signer)
+        let messageKeyData = try decrypt(encryptedMessage: encryptedSecretKey, from: userId, with: signer)
         return SecretKey(messageKeyData)
     }
 
-    public func decrypt(encryptedMessage: Message, from userId: UserId, with signer: Signer) throws -> Data {
+    public func decrypt(encryptedMessage: Ciphertext, from userId: UserId, with signer: Signer) throws -> Data {
+        let encryptedMessage = try decoder.decode(Message.self, from: encryptedMessage)
         guard let doubleRatchet = doubleRatchets[userId] else {
             throw CryptoManagerError.conversationNotInitialized
         }

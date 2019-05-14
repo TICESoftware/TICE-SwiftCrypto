@@ -181,7 +181,7 @@ final class CryptoTests: XCTestCase {
 
             // Bob gets prekey bundle and remote verification key from server
             let prekeyBundle = PrekeyBundle(identityKey: Bytes(publicKeyMaterial.identityKey), signedPrekey: Bytes(publicKeyMaterial.signedPrekey), prekeySignature: publicKeyMaterial.prekeySignature, oneTimePrekey: Bytes(publicKeyMaterial.oneTimePrekeys.last!))
-            let invitation = try bobsCryptoManager.initConversation(with: userId, remotePrekeyBundle: prekeyBundle, remoteSigningKey: user.publicSigningKey)
+            let invitation = try bobsCryptoManager.initConversation(with: userId, remoteIdentityKey: Data(prekeyBundle.identityKey), remoteSignedPrekey: Data(prekeyBundle.signedPrekey), remotePrekeySignature: prekeyBundle.prekeySignature, remoteOneTimePrekey: prekeyBundle.oneTimePrekey.map { Data($0) }, remoteSigningKey: user.publicSigningKey)
 
             // Invitation is transmitted...
 
