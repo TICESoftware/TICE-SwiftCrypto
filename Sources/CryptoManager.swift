@@ -57,7 +57,6 @@ public enum CertificateValidationError: LocalizedError {
 
 public typealias SecretKey = Bytes
 public typealias Certificate = String
-public typealias Ciphertext = Bytes
 
 public class CryptoManager {
 
@@ -179,13 +178,13 @@ public class CryptoManager {
     // MARK: Encryption / Decryption
 
     public func encrypt(_ data: Data, secretKey: SecretKey) throws -> Ciphertext {
-        guard let cipher: Ciphertext = sodium.aead.xchacha20poly1305ietf.encrypt(message: Bytes(data), secretKey: secretKey) else {
+        guard let cipher: Bytes = sodium.aead.xchacha20poly1305ietf.encrypt(message: Bytes(data), secretKey: secretKey) else {
             throw CryptoManagerError.encryptionError
         }
-        return cipher
+        return Data(cipher)
     }
 
-    public func decrypt(encryptedData: Data, secretKey: SecretKey) throws -> Data {
+    public func decrypt(encryptedData: Ciphertext, secretKey: SecretKey) throws -> Data {
         guard let plaintext = sodium.aead.xchacha20poly1305ietf.decrypt(nonceAndAuthenticatedCipherText: Bytes(encryptedData), secretKey: secretKey) else {
             throw CryptoManagerError.decryptionError
         }
@@ -200,7 +199,7 @@ public class CryptoManager {
         return try doubleRatchet.encrypt(plaintext: Bytes(data))
     }
 
-    public func encrypt(_ payloadData: Data, for members: Set<Member>) throws -> (ciphertext: Data, recipients: Set<Recipient>) {
+    public func encrypt(_ payloadData: Data, for members: Set<Member>) throws -> (ciphertext: Ciphertext, recipients: Set<Recipient>) {
         let secretKey = sodium.aead.xchacha20poly1305ietf.key()
         let encryptedMessage = try encrypt(payloadData, secretKey: secretKey)
 
@@ -235,7 +234,7 @@ public class CryptoManager {
         return (ciphertext: Data(encryptedMessage), recipients: recipients)
     }
 
-    private func decrypt(encryptedSecretKey: Data, from userId: UserId, with signer: Signer) throws -> SecretKey {
+    private func decrypt(encryptedSecretKey: Ciphertext, from userId: UserId, with signer: Signer) throws -> SecretKey {
         let encryptedMessageKey = try decoder.decode(Message.self, from: encryptedSecretKey)
         let messageKeyData = try decrypt(encryptedMessage: encryptedMessageKey, from: userId, with: signer)
         return SecretKey(messageKeyData)
@@ -250,7 +249,7 @@ public class CryptoManager {
         return Data(plaintext)
     }
 
-    public func decrypt(encryptedData: Data, encryptedSecretKey: Data, from userId: UserId, signer: Signer) throws -> Data {
+    public func decrypt(encryptedData: Ciphertext, encryptedSecretKey: Ciphertext, from userId: UserId, signer: Signer) throws -> Data {
         let secretKey = try decrypt(encryptedSecretKey: encryptedSecretKey, from: userId, with: signer)
         let plaintext = try decrypt(encryptedData: encryptedData, secretKey: secretKey)
 
