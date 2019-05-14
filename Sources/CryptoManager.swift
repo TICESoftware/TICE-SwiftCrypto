@@ -165,16 +165,22 @@ public class CryptoManager {
 
         doubleRatchets[userId] = try DoubleRatchet(keyPair: nil, remotePublicKey: remotePrekeyBundle.signedPrekey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
 
-        return ConversationInvitation(identityKey: keyAgreementInitiation.identityPublicKey, ephemeralKey: keyAgreementInitiation.ephemeralPublicKey, usedOneTimePrekey: keyAgreementInitiation.usedOneTimePrekey)
+        return ConversationInvitation(identityKey: Data(keyAgreementInitiation.identityPublicKey), ephemeralKey: Data(keyAgreementInitiation.ephemeralPublicKey), usedOneTimePrekey: keyAgreementInitiation.usedOneTimePrekey.map { Data($0) })
     }
 
     public func processConversationInvitation(_ conversationInvitation: ConversationInvitation, from userId: UserId) throws {
-        let sharedSecret = try handshake.sharedSecretFromKeyAgreement(remoteIdentityPublicKey: conversationInvitation.identityKey, remoteEphemeralPublicKey: conversationInvitation.ephemeralKey, usedOneTimePrekey: conversationInvitation.usedOneTimePrekey, info: info)
+        let sharedSecret = try handshake.sharedSecretFromKeyAgreement(remoteIdentityPublicKey: Bytes(conversationInvitation.identityKey), remoteEphemeralPublicKey: Bytes(conversationInvitation.ephemeralKey), usedOneTimePrekey: conversationInvitation.usedOneTimePrekey.map { Bytes($0) }, info: info)
 
         doubleRatchets[userId] = try DoubleRatchet(keyPair: handshake.signedPrekeyPair, remotePublicKey: nil, sharedSecret: sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
     }
 
     // MARK: Encryption / Decryption
+
+    public func encrypt(_ data: Data) throws -> (ciphertext: Ciphertext, secretKey: SecretKey) {
+        let secretKey = Data(sodium.aead.xchacha20poly1305ietf.key())
+        let ciphertext = try encrypt(data, secretKey: secretKey)
+        return (ciphertext: ciphertext, secretKey: secretKey)
+    }
 
     public func encrypt(_ data: Data, secretKey: SecretKey) throws -> Ciphertext {
         guard let cipher: Bytes = sodium.aead.xchacha20poly1305ietf.encrypt(message: Bytes(data), secretKey: Bytes(secretKey)) else {
@@ -190,47 +196,12 @@ public class CryptoManager {
         return Data(plaintext)
     }
 
-    public func encrypt(_ data: Data, for user: User) throws -> Message {
-        guard let doubleRatchet = doubleRatchets[user.userId] else {
+    public func encrypt(_ data: Data, for userId: UserId) throws -> Message {
+        guard let doubleRatchet = doubleRatchets[userId] else {
             throw CryptoManagerError.conversationNotInitialized
         }
 
         return try doubleRatchet.encrypt(plaintext: Bytes(data))
-    }
-
-    public func encrypt(_ payloadData: Data, for members: Set<Member>) throws -> (ciphertext: Ciphertext, recipients: Set<Recipient>) {
-        let secretKey = sodium.aead.xchacha20poly1305ietf.key()
-        let encryptedMessage = try encrypt(payloadData, secretKey: Data(secretKey))
-
-        var recipients = Set<Recipient>()
-        let operationQueue = OperationQueue()
-        let insertRecipientQueue = DispatchQueue(label: "de.anbion.cryptoManager.encrypt")
-
-        for member in members {
-            guard let serverSignedMembershipCertificate = member.membership.serverSignedMembershipCertificate else {
-                throw CryptoManagerError.missingMembershipCertificate(member: member)
-            }
-
-            operationQueue.addOperation {
-                guard let encryptedMessageKey = try? self.encrypt(Data(secretKey), for: member.user),
-                    let encryptedMessageKeyData = try? self.encoder.encode(encryptedMessageKey) else {
-                    return
-                }
-                let recipient = Recipient(userId: member.user.userId, serverSignedMembershipCertificate: serverSignedMembershipCertificate, encryptedMessageKey: encryptedMessageKeyData)
-
-                _ = insertRecipientQueue.sync {
-                    recipients.insert(recipient)
-                }
-            }
-        }
-
-        operationQueue.waitUntilAllOperationsAreFinished()
-
-        guard recipients.count == members.count else {
-            throw CryptoManagerError.encryptionError
-        }
-
-        return (ciphertext: Data(encryptedMessage), recipients: recipients)
     }
 
     private func decrypt(encryptedSecretKey: Ciphertext, from userId: UserId, with signer: Signer) throws -> SecretKey {

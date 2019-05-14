@@ -188,40 +188,11 @@ final class CryptoTests: XCTestCase {
             try cryptoManager.processConversationInvitation(invitation, from: bob.userId)
 
             let firstMessagePayload = "Hello!".data(using: .utf8)!
-            let firstMessage = try bobsCryptoManager.encrypt(firstMessagePayload, for: user)
+            let firstMessage = try bobsCryptoManager.encrypt(firstMessagePayload, for: userId)
 
             let plaintextData = try cryptoManager.decrypt(encryptedMessage: firstMessage, from: bob.userId, with: user)
 
             XCTAssertEqual(firstMessagePayload, plaintextData, "Invalid decrypted plaintext")
-        } catch {
-            XCTFail(error.localizedDescription)
-        }
-    }
-
-    func testGroupMessageCrypto() {
-        let bob = TestUser(userId: UserId())
-        let bobServerSignedMembershipCertificate = "Certificate"
-        let bobMembership = Membership(userId: bob.userId, groupId: GroupId(), admin: false, serverSignedMembershipCertificate: bobServerSignedMembershipCertificate)
-        let bobMember = Member(user: bob, membership: bobMembership)
-
-        let sharedSecret = Bytes(repeating: 0, count: 32)
-        let info = "testGroupMessageCrypto"
-        do {
-            let bobDoubleRatchet = try DoubleRatchet(keyPair: nil, remotePublicKey: nil, sharedSecret: sharedSecret, maxSkip: 2, maxCache: 2, info: info)
-            let doubleRatchetWithBob = try DoubleRatchet(keyPair: nil, remotePublicKey: bobDoubleRatchet.publicKey, sharedSecret: sharedSecret, maxSkip: 2, maxCache: 2, info: info)
-            cryptoManager.doubleRatchets[bob.userId] = doubleRatchetWithBob
-
-            let payloadData = "Hello!".data(using: .utf8)!
-            let (ciphertext, recipients) = try cryptoManager.encrypt(payloadData, for: Set([bobMember]))
-
-            XCTAssertEqual(recipients.count, 1, "Invalid recipients")
-            XCTAssertEqual(recipients.first!.userId, bob.userId)
-
-            let bobsCryptoManager = try CryptoManager(handshake: nil, encoder: JSONEncoder(), decoder: JSONDecoder())
-            bobsCryptoManager.doubleRatchets[userId] = bobDoubleRatchet
-            let plaintext = try bobsCryptoManager.decrypt(encryptedData: ciphertext, encryptedSecretKey: recipients.first!.encryptedMessageKey, from: userId, signer: bob)
-
-            XCTAssertEqual(payloadData, plaintext, "Invalid decrypted plaintext")
         } catch {
             XCTFail(error.localizedDescription)
         }
