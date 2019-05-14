@@ -150,8 +150,9 @@ public class CryptoManager {
 
     // MARK: Handshake
 
-    public func generatePublicHandshakeInfo(signer: Signer) throws -> PublicKeyMaterial {
-        return try handshake.createPrekeyBundle(oneTimePrekeysCount: 10, renewSignedPrekey: false, prekeySigner: { try sign(prekey: Data($0), with: signer) })
+    public func generatePublicHandshakeInfo(signer: Signer) throws -> UserPublicKeys {
+        let publicKeyMaterial = try handshake.createPrekeyBundle(oneTimePrekeysCount: 10, renewSignedPrekey: false, prekeySigner: { try sign(prekey: Data($0), with: signer) })
+        return UserPublicKeys(signingKey: signer.privateSigningKey, identityKey: Data(publicKeyMaterial.identityKey), signedPrekey: Data(publicKeyMaterial.signedPrekey), prekeySignature: publicKeyMaterial.prekeySignature, oneTimePrekeys: publicKeyMaterial.oneTimePrekeys.map { Data($0) })
     }
 
     public func initConversation(with userId: UserId, remotePrekeyBundle: PrekeyBundle, remoteSigningKey: LetsMeetModels.PublicKey) throws -> ConversationInvitation {

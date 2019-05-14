@@ -27,6 +27,6 @@ let package = Package(
             path: "Sources"),
         .testTarget(
             name: "LetsMeetCryptoTests",
-            dependencies: ["LetsMeetCrypto", "LetsMeetModels", "SwiftJWT", "CryptorECC", "DoubleRatchet"]),
+            dependencies: ["LetsMeetCrypto", "LetsMeetModels", "SwiftJWT", "CryptorECC", "DoubleRatchet", "X3DH"]),
     ]
 )

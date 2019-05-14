@@ -105,8 +105,8 @@
         "repositoryURL": "git@github.com:AnbionApps/X3DH.git",
         "state": {
           "branch": null,
-          "revision": "f246d122f493c6bcfa759a3dc59c6ee95b9df07d",
-          "version": "1.0.2"
+          "revision": "f0661d5b8f401d4938ad318f1156f839104acc01",
+          "version": "1.0.3"
         }
       }
     ]

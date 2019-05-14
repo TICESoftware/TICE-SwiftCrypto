@@ -3,6 +3,7 @@ import SwiftJWT
 import CryptorECC
 import Sodium
 import DoubleRatchet
+import X3DH
 @testable import LetsMeetModels
 @testable import LetsMeetCrypto
 
@@ -171,7 +172,7 @@ final class CryptoTests: XCTestCase {
 
     func testInitializeConversation() {
         do {
-            var publicKeyMaterial = try cryptoManager.generatePublicHandshakeInfo(signer: user)
+            let publicKeyMaterial = try cryptoManager.generatePublicHandshakeInfo(signer: user)
 
             // Publish public key material...
 
@@ -179,7 +180,7 @@ final class CryptoTests: XCTestCase {
             let bobsCryptoManager = try CryptoManager(handshake: nil, encoder: JSONEncoder(), decoder: JSONDecoder())
 
             // Bob gets prekey bundle and remote verification key from server
-            let prekeyBundle = publicKeyMaterial.prekeyBundle()
+            let prekeyBundle = PrekeyBundle(identityKey: Bytes(publicKeyMaterial.identityKey), signedPrekey: Bytes(publicKeyMaterial.signedPrekey), prekeySignature: publicKeyMaterial.prekeySignature, oneTimePrekey: Bytes(publicKeyMaterial.oneTimePrekeys.last!))
             let invitation = try bobsCryptoManager.initConversation(with: userId, remotePrekeyBundle: prekeyBundle, remoteSigningKey: user.publicSigningKey)
 
             // Invitation is transmitted...
