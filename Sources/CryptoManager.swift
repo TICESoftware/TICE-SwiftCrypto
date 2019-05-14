@@ -86,7 +86,7 @@ public class CryptoManager {
         let privateKeyBytes = privateSigningKey.pemString.bytes
         let publicKeyBytes = publicSigningKey.pemString.bytes
 
-        return SigningKeyPair(privateKey: privateKeyBytes, publicKey: publicKeyBytes)
+        return SigningKeyPair(privateKey: Data(privateKeyBytes), publicKey: Data(publicKeyBytes))
     }
 
     public func generateGroupKey() -> SecretKey {
@@ -109,8 +109,7 @@ public class CryptoManager {
         let claims = MembershipClaims(iss: issuer, sub: userId, iat: issueDate, exp: issueDate.addingTimeInterval(3600), groupId: groupId, admin: admin)
         var jwt = JWT(claims: claims)
 
-        let privateKeyData = Data(signingKey)
-        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData)
+        let jwtSigner = JWTSigner.es512(privateKey: signingKey)
 
         return try jwt.sign(using: jwtSigner)
     }
@@ -119,13 +118,12 @@ public class CryptoManager {
         try validate(certificate: certificate, membership: membership, issuer: .user(issuer.userId), publicKey: issuer.publicSigningKey)
     }
 
-    public func validateServerSignedMembershipCertificate(certificate: Certificate, membership: Membership, publicKey: PublicKey) throws {
+    public func validateServerSignedMembershipCertificate(certificate: Certificate, membership: Membership, publicKey: LetsMeetModels.PublicKey) throws {
         try validate(certificate: certificate, membership: membership, issuer: .server, publicKey: publicKey)
     }
 
-    private func validate(certificate: Certificate, membership: Membership, issuer: MembershipClaims.Issuer, publicKey: PublicKey) throws {
-        let publicKeyData = Data(publicKey)
-        let jwtVerifier = JWTVerifier.es512(publicKey: publicKeyData)
+    private func validate(certificate: Certificate, membership: Membership, issuer: MembershipClaims.Issuer, publicKey: LetsMeetModels.PublicKey) throws {
+        let jwtVerifier = JWTVerifier.es512(publicKey: publicKey)
 
         let jwt = try JWT<MembershipClaims>(jwtString: certificate)
 
@@ -156,16 +154,16 @@ public class CryptoManager {
     // MARK: Handshake
 
     public func generatePublicHandshakeInfo(signer: Signer) throws -> PublicKeyMaterial {
-        return try handshake.createPrekeyBundle(oneTimePrekeysCount: 10, renewSignedPrekey: false, prekeySigner: { try sign(prekey: $0, with: signer) })
+        return try handshake.createPrekeyBundle(oneTimePrekeysCount: 10, renewSignedPrekey: false, prekeySigner: { try sign(prekey: Data($0), with: signer) })
     }
 
-    public func initConversation(with userId: UserId, remotePrekeyBundle: PrekeyBundle, remoteSigningKey: PublicKey) throws -> ConversationInvitation {
-        guard let remoteSigningKeyPemString = remoteSigningKey.utf8String,
+    public func initConversation(with userId: UserId, remotePrekeyBundle: PrekeyBundle, remoteSigningKey: LetsMeetModels.PublicKey) throws -> ConversationInvitation {
+        guard let remoteSigningKeyPemString = Bytes(remoteSigningKey).utf8String,
             let remoteSigningKey = try? ECPublicKey(key: remoteSigningKeyPemString) else {
                 throw CryptoManagerError.invalidKey
         }
 
-        let keyAgreementInitiation = try handshake.initiateKeyAgreement(remotePrekeyBundle: remotePrekeyBundle, prekeySignatureVerifier: { verify(prekeySignature: $0, prekey: remotePrekeyBundle.signedPrekey, verificationPublicKey: remoteSigningKey) }, info: info)
+        let keyAgreementInitiation = try handshake.initiateKeyAgreement(remotePrekeyBundle: remotePrekeyBundle, prekeySignatureVerifier: { verify(prekeySignature: $0, prekey: Data(remotePrekeyBundle.signedPrekey), verificationPublicKey: remoteSigningKey) }, info: info)
 
         doubleRatchets[userId] = try DoubleRatchet(keyPair: nil, remotePublicKey: remotePrekeyBundle.signedPrekey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
 
@@ -261,17 +259,16 @@ public class CryptoManager {
 
     // MARK: Sign / verify
 
-    private func sign(prekey: PublicKey, with signer: Signer) throws -> Signatur {
-        let publicKeyData = Data(prekey)
-        guard let privateKeyString = signer.privateSigningKey.utf8String else {
+    private func sign(prekey: LetsMeetModels.PublicKey, with signer: Signer) throws -> Signatur {
+        guard let privateKeyString = Bytes(signer.privateSigningKey).utf8String else {
             throw CryptoManagerError.invalidKey
         }
         let signingKey = try ECPrivateKey(key: privateKeyString)
-        let sig = try publicKeyData.sign(with: signingKey)
+        let sig = try prekey.sign(with: signingKey)
         return sig.asn1
     }
 
-    private func verify(prekeySignature: Signatur, prekey: PublicKey, verificationPublicKey: ECPublicKey) -> Bool {
+    private func verify(prekeySignature: Signatur, prekey: LetsMeetModels.PublicKey, verificationPublicKey: ECPublicKey) -> Bool {
         guard let sig = try? ECSignature(asn1: prekeySignature) else { return false }
         return sig.verify(plaintext: Data(prekey), using: verificationPublicKey)
     }

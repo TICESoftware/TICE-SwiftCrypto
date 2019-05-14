@@ -16,7 +16,7 @@ final class CryptoTests: XCTestCase {
     lazy var membership: Membership = { Membership(userId: self.userId, groupId: self.groupId, admin: true) }()
 
     func testUserSignedMembershipCertificate() {
-        guard let certificate = try? cryptoManager.createUserSignedMembershipCertificate(userId: userId, groupId: groupId, admin: true, signer: user) else {
+        guard let certificate = try? cryptoManager.createUserSignedMembershipCertificate(userId: userId, groupId: groupId, admin: true, signerUserId: userId, signer: user) else {
             XCTFail("Could not create certificate.")
             return
         }
@@ -35,13 +35,13 @@ final class CryptoTests: XCTestCase {
         let signingPublicKey = try! signingPrivateKey.extractPublicKey()
         let signingPublicKeyBytes = signingPublicKey.pemString.bytes
 
-        guard let certificate = try? cryptoManager.createServerSignedMembershipCertificate(userId: userId, groupId: groupId, admin: true, signingKey: signingPrivateKeyBytes) else {
+        guard let certificate = try? cryptoManager.createServerSignedMembershipCertificate(userId: userId, groupId: groupId, admin: true, signingKey: Data(signingPrivateKeyBytes)) else {
             XCTFail("Could not create certificate.")
             return
         }
 
         do {
-            try cryptoManager.validateServerSignedMembershipCertificate(certificate: certificate, membership: membership, publicKey: signingPublicKeyBytes)
+            try cryptoManager.validateServerSignedMembershipCertificate(certificate: certificate, membership: membership, publicKey: Data(signingPublicKeyBytes))
         } catch {
             XCTFail(error.localizedDescription)
         }
@@ -50,9 +50,9 @@ final class CryptoTests: XCTestCase {
     func testValidateMembershipCertificateInvalidMembership() {
         let fakeId = UUID(uuidString: "A621E1F8-C36C-495A-93FC-0C247A3E6E5F")!
 
-        guard let certificateInvalidGroupId = try? cryptoManager.createUserSignedMembershipCertificate(userId: userId, groupId: fakeId, admin: true, signer: user),
-            let certificateInvalidUserId = try? cryptoManager.createUserSignedMembershipCertificate(userId: fakeId, groupId: groupId, admin: true, signer: user),
-            let certificateInvalidAdminFlag = try? cryptoManager.createUserSignedMembershipCertificate(userId: userId, groupId: groupId, admin: false, signer: user) else {
+        guard let certificateInvalidGroupId = try? cryptoManager.createUserSignedMembershipCertificate(userId: userId, groupId: fakeId, admin: true, signerUserId: userId, signer: user),
+            let certificateInvalidUserId = try? cryptoManager.createUserSignedMembershipCertificate(userId: fakeId, groupId: groupId, admin: true, signerUserId: fakeId, signer: user),
+            let certificateInvalidAdminFlag = try? cryptoManager.createUserSignedMembershipCertificate(userId: userId, groupId: groupId, admin: false, signerUserId: userId, signer: user) else {
             XCTFail("Could not create certificate.")
             return
         }
@@ -180,7 +180,7 @@ final class CryptoTests: XCTestCase {
 
             // Bob gets prekey bundle and remote verification key from server
             let prekeyBundle = publicKeyMaterial.prekeyBundle()
-            let invitation = try bobsCryptoManager.initConversation(with: userId, remotePrekeyBundle: prekeyBundle, remoteVerificationKey: user.publicSigningKey)
+            let invitation = try bobsCryptoManager.initConversation(with: userId, remotePrekeyBundle: prekeyBundle, remoteSigningKey: user.publicSigningKey)
 
             // Invitation is transmitted...
 
@@ -242,9 +242,9 @@ class TestUser: User, Signer {
 
     init(userId: UserId) {
         let signingKey = try! ECPrivateKey.make(for: .secp521r1)
-        self.privateSigningKey = signingKey.pemString.bytes
+        self.privateSigningKey = Data(signingKey.pemString.bytes)
 
         let publicSigningKey = try! signingKey.extractPublicKey().pemString.bytes
-        super.init(userId: userId, publicSigningKey: publicSigningKey)
+        super.init(userId: userId, publicSigningKey: Data(publicSigningKey))
     }
 }
