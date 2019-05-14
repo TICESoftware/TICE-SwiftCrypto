@@ -55,9 +55,6 @@ public enum CertificateValidationError: LocalizedError {
     }
 }
 
-public typealias SecretKey = Bytes
-public typealias Certificate = String
-
 public class CryptoManager {
 
     let sodium = Sodium()
@@ -89,7 +86,7 @@ public class CryptoManager {
     }
 
     public func generateGroupKey() -> SecretKey {
-        return sodium.aead.xchacha20poly1305ietf.key()
+        return Data(sodium.aead.xchacha20poly1305ietf.key())
     }
 
     // MARK: Membership certificates
@@ -147,7 +144,8 @@ public class CryptoManager {
         inputKeyingMaterial.append(contentsOf: groupKey)
         inputKeyingMaterial.append(contentsOf: user.publicSigningKey)
 
-        return try deriveHKDFKey(ikm: inputKeyingMaterial, L: 32)
+        let key = try deriveHKDFKey(ikm: inputKeyingMaterial, L: 32)
+        return Data(key)
     }
 
     // MARK: Handshake
@@ -178,14 +176,14 @@ public class CryptoManager {
     // MARK: Encryption / Decryption
 
     public func encrypt(_ data: Data, secretKey: SecretKey) throws -> Ciphertext {
-        guard let cipher: Bytes = sodium.aead.xchacha20poly1305ietf.encrypt(message: Bytes(data), secretKey: secretKey) else {
+        guard let cipher: Bytes = sodium.aead.xchacha20poly1305ietf.encrypt(message: Bytes(data), secretKey: Bytes(secretKey)) else {
             throw CryptoManagerError.encryptionError
         }
         return Data(cipher)
     }
 
     public func decrypt(encryptedData: Ciphertext, secretKey: SecretKey) throws -> Data {
-        guard let plaintext = sodium.aead.xchacha20poly1305ietf.decrypt(nonceAndAuthenticatedCipherText: Bytes(encryptedData), secretKey: secretKey) else {
+        guard let plaintext = sodium.aead.xchacha20poly1305ietf.decrypt(nonceAndAuthenticatedCipherText: Bytes(encryptedData), secretKey: Bytes(secretKey)) else {
             throw CryptoManagerError.decryptionError
         }
         return Data(plaintext)
@@ -201,7 +199,7 @@ public class CryptoManager {
 
     public func encrypt(_ payloadData: Data, for members: Set<Member>) throws -> (ciphertext: Ciphertext, recipients: Set<Recipient>) {
         let secretKey = sodium.aead.xchacha20poly1305ietf.key()
-        let encryptedMessage = try encrypt(payloadData, secretKey: secretKey)
+        let encryptedMessage = try encrypt(payloadData, secretKey: Data(secretKey))
 
         var recipients = Set<Recipient>()
         let operationQueue = OperationQueue()
