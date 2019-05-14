@@ -79,14 +79,14 @@ public class CryptoManager {
         self.decoder = decoder
     }
 
-    public func generateSigningKeyPair() throws -> (privateKey: PrivateKey, publicKey: PublicKey) {
+    public func generateSigningKeyPair() throws -> SigningKeyPair {
         let privateSigningKey = try ECPrivateKey.make(for: .secp521r1)
         let publicSigningKey = try privateSigningKey.extractPublicKey()
 
         let privateKeyBytes = privateSigningKey.pemString.bytes
         let publicKeyBytes = publicSigningKey.pemString.bytes
 
-        return (privateKey: privateKeyBytes, publicKey: publicKeyBytes)
+        return SigningKeyPair(privateKey: privateKeyBytes, publicKey: publicKeyBytes)
     }
 
     public func generateGroupKey() -> SecretKey {
