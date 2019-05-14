@@ -80,12 +80,11 @@ public class CryptoManager {
     }
 
     public func generateSigningKeyPair() throws -> (privateKey: PrivateKey, publicKey: PublicKey) {
-
         let privateSigningKey = try ECPrivateKey.make(for: .secp521r1)
-        let publicVerificationKey = try privateSigningKey.extractPublicKey()
+        let publicSigningKey = try privateSigningKey.extractPublicKey()
 
         let privateKeyBytes = privateSigningKey.pemString.bytes
-        let publicKeyBytes = publicVerificationKey.pemString.bytes
+        let publicKeyBytes = publicSigningKey.pemString.bytes
 
         return (privateKey: privateKeyBytes, publicKey: publicKeyBytes)
     }
@@ -96,8 +95,8 @@ public class CryptoManager {
 
     // MARK: Membership certificates
 
-    public func createUserSignedMembershipCertificate(userId: UserId, groupId: GroupId, admin: Bool, signer: Signer) throws -> Certificate {
-        return try createMembershipCertificate(userId: userId, groupId: groupId, admin: admin, issuer: .user(signer.userId), signingKey: signer.privateSigningKey)
+    public func createUserSignedMembershipCertificate(userId: UserId, groupId: GroupId, admin: Bool, signerUserId: UserId, signer: Signer) throws -> Certificate {
+        return try createMembershipCertificate(userId: userId, groupId: groupId, admin: admin, issuer: .user(signerUserId), signingKey: signer.privateSigningKey)
     }
 
     public func createServerSignedMembershipCertificate(userId: UserId, groupId: GroupId, admin: Bool, signingKey: PrivateKey) throws -> Certificate {
@@ -160,13 +159,13 @@ public class CryptoManager {
         return try handshake.createPrekeyBundle(oneTimePrekeysCount: 10, renewSignedPrekey: false, prekeySigner: { try sign(prekey: $0, with: signer) })
     }
 
-    public func initConversation(with userId: UserId, remotePrekeyBundle: PrekeyBundle, remoteVerificationKey: PublicKey) throws -> ConversationInvitation {
-        guard let remoteVerificationKeyPemString = remoteVerificationKey.utf8String,
-            let remoteVerificationKey = try? ECPublicKey(key: remoteVerificationKeyPemString) else {
+    public func initConversation(with userId: UserId, remotePrekeyBundle: PrekeyBundle, remoteSigningKey: PublicKey) throws -> ConversationInvitation {
+        guard let remoteSigningKeyPemString = remoteSigningKey.utf8String,
+            let remoteSigningKey = try? ECPublicKey(key: remoteSigningKeyPemString) else {
                 throw CryptoManagerError.invalidKey
         }
 
-        let keyAgreementInitiation = try handshake.initiateKeyAgreement(remotePrekeyBundle: remotePrekeyBundle, prekeySignatureVerifier: { verify(prekeySignature: $0, prekey: remotePrekeyBundle.signedPrekey, verificationPublicKey: remoteVerificationKey) }, info: info)
+        let keyAgreementInitiation = try handshake.initiateKeyAgreement(remotePrekeyBundle: remotePrekeyBundle, prekeySignatureVerifier: { verify(prekeySignature: $0, prekey: remotePrekeyBundle.signedPrekey, verificationPublicKey: remoteSigningKey) }, info: info)
 
         doubleRatchets[userId] = try DoubleRatchet(keyPair: nil, remotePublicKey: remotePrekeyBundle.signedPrekey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
 
