@@ -190,7 +190,7 @@ final class CryptoTests: XCTestCase {
             let firstMessagePayload = "Hello!".data(using: .utf8)!
             let firstMessage = try bobsCryptoManager.encrypt(firstMessagePayload, for: userId)
 
-            let plaintextData = try cryptoManager.decrypt(encryptedMessage: firstMessage, from: bob.userId, with: user)
+            let plaintextData = try cryptoManager.decrypt(encryptedMessage: firstMessage, from: bob.userId)
 
             XCTAssertEqual(firstMessagePayload, plaintextData, "Invalid decrypted plaintext")
         } catch {

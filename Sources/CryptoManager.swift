@@ -206,12 +206,12 @@ public class CryptoManager {
         return try encoder.encode(message)
     }
 
-    private func decrypt(encryptedSecretKey: Ciphertext, from userId: UserId, with signer: Signer) throws -> SecretKey {
-        let messageKeyData = try decrypt(encryptedMessage: encryptedSecretKey, from: userId, with: signer)
+    private func decrypt(encryptedSecretKey: Ciphertext, from userId: UserId) throws -> SecretKey {
+        let messageKeyData = try decrypt(encryptedMessage: encryptedSecretKey, from: userId)
         return SecretKey(messageKeyData)
     }
 
-    public func decrypt(encryptedMessage: Ciphertext, from userId: UserId, with signer: Signer) throws -> Data {
+    public func decrypt(encryptedMessage: Ciphertext, from userId: UserId) throws -> Data {
         let encryptedMessage = try decoder.decode(Message.self, from: encryptedMessage)
         guard let doubleRatchet = doubleRatchets[userId] else {
             throw CryptoManagerError.conversationNotInitialized
@@ -221,8 +221,8 @@ public class CryptoManager {
         return Data(plaintext)
     }
 
-    public func decrypt(encryptedData: Ciphertext, encryptedSecretKey: Ciphertext, from userId: UserId, signer: Signer) throws -> Data {
-        let secretKey = try decrypt(encryptedSecretKey: encryptedSecretKey, from: userId, with: signer)
+    public func decrypt(encryptedData: Ciphertext, encryptedSecretKey: Ciphertext, from userId: UserId) throws -> Data {
+        let secretKey = try decrypt(encryptedSecretKey: encryptedSecretKey, from: userId)
         let plaintext = try decrypt(encryptedData: encryptedData, secretKey: secretKey)
 
         return plaintext
