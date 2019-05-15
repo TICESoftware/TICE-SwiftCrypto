@@ -79,10 +79,18 @@ public class CryptoManager {
         let privateSigningKey = try ECPrivateKey.make(for: .secp521r1)
         let publicSigningKey = try privateSigningKey.extractPublicKey()
 
-        let privateKeyBytes = privateSigningKey.pemString.bytes
-        let publicKeyBytes = publicSigningKey.pemString.bytes
+        return SigningKeyPair(privateKey: signingKey(from: privateSigningKey.pemString), publicKey: signingKey(from: publicSigningKey.pemString))
+    }
 
-        return SigningKeyPair(privateKey: Data(privateKeyBytes), publicKey: Data(publicKeyBytes))
+    public func signingKeyString(from key: Data) throws -> String {
+        guard let keyString = Bytes(key).utf8String else {
+            throw CryptoManagerError.invalidKey
+        }
+        return keyString
+    }
+
+    public func signingKey(from pemString: String) -> Data {
+        return Data(pemString.bytes)
     }
 
     public func generateGroupKey() -> SecretKey {
