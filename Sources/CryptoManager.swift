@@ -241,7 +241,7 @@ public class CryptoManager {
 
     // MARK: Sign / verify
 
-    private func sign(prekey: LetsMeetModels.PublicKey, with signer: Signer) throws -> Signatur {
+    private func sign(prekey: LetsMeetModels.PublicKey, with signer: Signer) throws -> Signature {
         guard let privateKeyString = Bytes(signer.privateSigningKey).utf8String else {
             throw CryptoManagerError.invalidKey
         }
@@ -250,7 +250,7 @@ public class CryptoManager {
         return sig.asn1
     }
 
-    private func verify(prekeySignature: Signatur, prekey: LetsMeetModels.PublicKey, verificationPublicKey: ECPublicKey) -> Bool {
+    private func verify(prekeySignature: Signature, prekey: LetsMeetModels.PublicKey, verificationPublicKey: ECPublicKey) -> Bool {
         guard let sig = try? ECSignature(asn1: prekeySignature) else { return false }
         return sig.verify(plaintext: Data(prekey), using: verificationPublicKey)
     }
