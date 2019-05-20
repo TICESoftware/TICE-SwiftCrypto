@@ -158,8 +158,8 @@ public class CryptoManager {
 
     // MARK: Handshake
 
-    public func generatePublicHandshakeInfo(signer: Signer) throws -> UserPublicKeys {
-        let publicKeyMaterial = try handshake.createPrekeyBundle(oneTimePrekeysCount: 10, renewSignedPrekey: false, prekeySigner: { try sign(prekey: Data($0), with: signer) })
+    public func generatePublicHandshakeInfo(signer: Signer, renewSignedPrekey: Bool = false) throws -> UserPublicKeys {
+        let publicKeyMaterial = try handshake.createPrekeyBundle(oneTimePrekeysCount: 100, renewSignedPrekey: renewSignedPrekey, prekeySigner: { try sign(prekey: Data($0), with: signer) })
         let privateSigningKeyString = try signingKeyString(from: signer.privateSigningKey)
         let privateSigningKey = try ECPrivateKey(key: privateSigningKeyString)
         let publicSigningKey = try privateSigningKey.extractPublicKey()
