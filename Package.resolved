@@ -68,9 +68,9 @@
         "package": "LetsMeetModels",
         "repositoryURL": "git@github.com:AnbionApps/letsmeet-models.git",
         "state": {
-          "branch": "applyCrypto",
-          "revision": "85abd68760ad3cea4457e911651d9cf4255e2525",
-          "version": null
+          "branch": null,
+          "revision": "41c343bb705d963f868a4140fecacbcabfdba91b",
+          "version": "9.0.0"
         }
       },
       {
