@@ -24,8 +24,8 @@
         "repositoryURL": "https://github.com/IBM-Swift/BlueRSA.git",
         "state": {
           "branch": null,
-          "revision": "408b0c8161001ec5e636bc29bc3006290e570dc0",
-          "version": "1.0.28"
+          "revision": "241ea93df2c44f85da3fcf6b704b029b1bcc138d",
+          "version": "1.0.31"
         }
       },
       {
@@ -69,8 +69,8 @@
         "repositoryURL": "git@github.com:AnbionApps/letsmeet-models.git",
         "state": {
           "branch": null,
-          "revision": "e394e6131873e86ecc066f3193cee83628f57b2d",
-          "version": "8.0.0"
+          "revision": "41c343bb705d963f868a4140fecacbcabfdba91b",
+          "version": "9.0.0"
         }
       },
       {
@@ -87,8 +87,8 @@
         "repositoryURL": "https://github.com/IBM-Swift/Swift-JWT.git",
         "state": {
           "branch": null,
-          "revision": "cf798b7f5bb7c4d4344fe4cc6fba1e5b631c5635",
-          "version": "3.4.1"
+          "revision": "2783f004ddb4b8ccc1dfc979880e2fe44f284882",
+          "version": "3.5.0"
         }
       },
       {
@@ -105,8 +105,8 @@
         "repositoryURL": "git@github.com:AnbionApps/X3DH.git",
         "state": {
           "branch": null,
-          "revision": "3cffbd1a66397da48a1dbd8e9feed0d60e9be889",
-          "version": "1.0.1"
+          "revision": "dabdabf9d9c72f47a6947afbfe40b649278c689d",
+          "version": "1.0.4"
         }
       }
     ]

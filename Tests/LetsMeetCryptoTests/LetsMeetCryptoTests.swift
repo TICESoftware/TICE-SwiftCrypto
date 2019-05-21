@@ -3,6 +3,7 @@ import SwiftJWT
 import CryptorECC
 import Sodium
 import DoubleRatchet
+import X3DH
 @testable import LetsMeetModels
 @testable import LetsMeetCrypto
 
@@ -16,7 +17,7 @@ final class CryptoTests: XCTestCase {
     lazy var membership: Membership = { Membership(userId: self.userId, groupId: self.groupId, admin: true) }()
 
     func testUserSignedMembershipCertificate() {
-        guard let certificate = try? cryptoManager.createUserSignedMembershipCertificate(userId: userId, groupId: groupId, admin: true, signer: user) else {
+        guard let certificate = try? cryptoManager.createUserSignedMembershipCertificate(userId: userId, groupId: groupId, admin: true, signerUserId: userId, signer: user) else {
             XCTFail("Could not create certificate.")
             return
         }
@@ -30,15 +31,18 @@ final class CryptoTests: XCTestCase {
 
     func testServerSignedMembershipCertificate() {
         let signingPrivateKey = try! ECPrivateKey.make(for: .secp521r1)
-        let signingPublicKey = try! signingPrivateKey.extractPublicKey()
+        let signingPrivateKeyBytes = signingPrivateKey.pemString.bytes
 
-        guard let certificate = try? cryptoManager.createServerSignedMembershipCertificate(userId: userId, groupId: groupId, admin: true, signingKey: signingPrivateKey) else {
+        let signingPublicKey = try! signingPrivateKey.extractPublicKey()
+        let signingPublicKeyBytes = signingPublicKey.pemString.bytes
+
+        guard let certificate = try? cryptoManager.createServerSignedMembershipCertificate(userId: userId, groupId: groupId, admin: true, signingKey: Data(signingPrivateKeyBytes)) else {
             XCTFail("Could not create certificate.")
             return
         }
 
         do {
-            try cryptoManager.validateServerSignedMembershipCertificate(certificate: certificate, membership: membership, publicKey: signingPublicKey.pemString)
+            try cryptoManager.validateServerSignedMembershipCertificate(certificate: certificate, membership: membership, publicKey: Data(signingPublicKeyBytes))
         } catch {
             XCTFail(error.localizedDescription)
         }
@@ -47,9 +51,9 @@ final class CryptoTests: XCTestCase {
     func testValidateMembershipCertificateInvalidMembership() {
         let fakeId = UUID(uuidString: "A621E1F8-C36C-495A-93FC-0C247A3E6E5F")!
 
-        guard let certificateInvalidGroupId = try? cryptoManager.createUserSignedMembershipCertificate(userId: userId, groupId: fakeId, admin: true, signer: user),
-            let certificateInvalidUserId = try? cryptoManager.createUserSignedMembershipCertificate(userId: fakeId, groupId: groupId, admin: true, signer: user),
-            let certificateInvalidAdminFlag = try? cryptoManager.createUserSignedMembershipCertificate(userId: userId, groupId: groupId, admin: false, signer: user) else {
+        guard let certificateInvalidGroupId = try? cryptoManager.createUserSignedMembershipCertificate(userId: userId, groupId: fakeId, admin: true, signerUserId: userId, signer: user),
+            let certificateInvalidUserId = try? cryptoManager.createUserSignedMembershipCertificate(userId: fakeId, groupId: groupId, admin: true, signerUserId: fakeId, signer: user),
+            let certificateInvalidAdminFlag = try? cryptoManager.createUserSignedMembershipCertificate(userId: userId, groupId: groupId, admin: false, signerUserId: userId, signer: user) else {
             XCTFail("Could not create certificate.")
             return
         }
@@ -92,7 +96,7 @@ final class CryptoTests: XCTestCase {
         let claims = MembershipClaims(iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(-20), exp: Date().addingTimeInterval(-10), groupId: groupId, admin: true)
         var jwt = JWT(claims: claims)
 
-        let privateKeyData = user.signingPrivateKey.pemString.data(using: .utf8)!
+        let privateKeyData = Data(user.privateSigningKey)
         let jwtSigner = JWTSigner.es512(privateKey: privateKeyData)
 
         guard let certificate = try? jwt.sign(using: jwtSigner) else {
@@ -117,7 +121,7 @@ final class CryptoTests: XCTestCase {
         let claims = MembershipClaims(iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(60), exp: Date().addingTimeInterval(3600), groupId: groupId, admin: true)
         var jwt = JWT(claims: claims)
 
-        let privateKeyData = user.signingPrivateKey.pemString.data(using: .utf8)!
+        let privateKeyData = Data(user.privateSigningKey)
         let jwtSigner = JWTSigner.es512(privateKey: privateKeyData)
 
         guard let certificate = try? jwt.sign(using: jwtSigner) else {
@@ -168,7 +172,7 @@ final class CryptoTests: XCTestCase {
 
     func testInitializeConversation() {
         do {
-            var publicKeyMaterial = try cryptoManager.generatePublicHandshakeInfo(signer: user)
+            let publicKeyMaterial = try cryptoManager.generatePublicHandshakeInfo(signer: user)
 
             // Publish public key material...
 
@@ -176,50 +180,19 @@ final class CryptoTests: XCTestCase {
             let bobsCryptoManager = try CryptoManager(handshake: nil, encoder: JSONEncoder(), decoder: JSONDecoder())
 
             // Bob gets prekey bundle and remote verification key from server
-            let prekeyBundle = publicKeyMaterial.prekeyBundle()
-            let remoteVerificationKey = try ECPublicKey(key: user.publicKeys.signingKey)
-
-            let invitation = try bobsCryptoManager.initConversation(with: userId, remotePrekeyBundle: prekeyBundle, remoteVerificationKey: remoteVerificationKey)
+            let prekeyBundle = PrekeyBundle(identityKey: Bytes(publicKeyMaterial.identityKey), signedPrekey: Bytes(publicKeyMaterial.signedPrekey), prekeySignature: publicKeyMaterial.prekeySignature, oneTimePrekey: Bytes(publicKeyMaterial.oneTimePrekeys.last!))
+            let invitation = try bobsCryptoManager.initConversation(with: userId, remoteIdentityKey: Data(prekeyBundle.identityKey), remoteSignedPrekey: Data(prekeyBundle.signedPrekey), remotePrekeySignature: prekeyBundle.prekeySignature, remoteOneTimePrekey: prekeyBundle.oneTimePrekey.map { Data($0) }, remoteSigningKey: user.publicSigningKey)
 
             // Invitation is transmitted...
 
             try cryptoManager.processConversationInvitation(invitation, from: bob.userId)
 
             let firstMessagePayload = "Hello!".data(using: .utf8)!
-            let firstMessage = try bobsCryptoManager.encrypt(firstMessagePayload, for: user)
+            let firstMessage = try bobsCryptoManager.encrypt(firstMessagePayload, for: userId)
 
-            let plaintextData = try cryptoManager.decrypt(encryptedMessage: firstMessage, from: bob.userId, with: user)
+            let plaintextData = try cryptoManager.decrypt(encryptedMessage: firstMessage, from: bob.userId)
 
             XCTAssertEqual(firstMessagePayload, plaintextData, "Invalid decrypted plaintext")
-        } catch {
-            XCTFail(error.localizedDescription)
-        }
-    }
-
-    func testGroupMessageCrypto() {
-        let bob = TestUser(userId: UserId())
-        let bobServerSignedMembershipCertificate = "Certificate"
-        let bobMembership = Membership(userId: bob.userId, groupId: GroupId(), admin: false, serverSignedMembershipCertificate: bobServerSignedMembershipCertificate)
-        let bobMember = Member(user: bob, membership: bobMembership)
-
-        let sharedSecret = Bytes(repeating: 0, count: 32)
-        let info = "testGroupMessageCrypto"
-        do {
-            let bobDoubleRatchet = try DoubleRatchet(keyPair: nil, remotePublicKey: nil, sharedSecret: sharedSecret, maxSkip: 2, maxCache: 2, info: info)
-            let doubleRatchetWithBob = try DoubleRatchet(keyPair: nil, remotePublicKey: bobDoubleRatchet.publicKey, sharedSecret: sharedSecret, maxSkip: 2, maxCache: 2, info: info)
-            cryptoManager.doubleRatchets[bob.userId] = doubleRatchetWithBob
-
-            let payloadData = "Hello!".data(using: .utf8)!
-            let (ciphertext, recipients) = try cryptoManager.encrypt(payloadData, for: Set([bobMember]))
-
-            XCTAssertEqual(recipients.count, 1, "Invalid recipients")
-            XCTAssertEqual(recipients.first!.userId, bob.userId)
-
-            let bobsCryptoManager = try CryptoManager(handshake: nil, encoder: JSONEncoder(), decoder: JSONDecoder())
-            bobsCryptoManager.doubleRatchets[userId] = bobDoubleRatchet
-            let plaintext = try bobsCryptoManager.decrypt(encryptedData: ciphertext, encryptedSecretKey: recipients.first!.encryptedMessageKey, from: userId, signer: bob)
-
-            XCTAssertEqual(payloadData, plaintext, "Invalid decrypted plaintext")
         } catch {
             XCTFail(error.localizedDescription)
         }
@@ -237,12 +210,13 @@ final class CryptoTests: XCTestCase {
 }
 
 class TestUser: User, Signer {
-    let signingPrivateKey: ECPrivateKey
+    let privateSigningKey: PrivateKey
 
     init(userId: UserId) {
-        self.signingPrivateKey = try! ECPrivateKey.make(for: .secp521r1)
+        let signingKey = try! ECPrivateKey.make(for: .secp521r1)
+        self.privateSigningKey = Data(signingKey.pemString.bytes)
 
-        let publicSigningKey = try! self.signingPrivateKey.extractPublicKey()
-        super.init(userId: userId, publicKeys: UserPublicKeys(signingKey: publicSigningKey.pemString))
+        let publicSigningKey = try! signingKey.extractPublicKey().pemString.bytes
+        super.init(userId: userId, publicSigningKey: Data(publicSigningKey))
     }
 }
