@@ -217,6 +217,6 @@ class TestUser: User, Signer {
         self.privateSigningKey = Data(signingKey.pemString.bytes)
 
         let publicSigningKey = try! signingKey.extractPublicKey().pemString.bytes
-        super.init(userId: userId, publicSigningKey: Data(publicSigningKey))
+        super.init(userId: userId, publicSigningKey: Data(publicSigningKey), publicName: nil)
     }
 }
