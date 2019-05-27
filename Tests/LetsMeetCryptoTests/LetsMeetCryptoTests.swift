@@ -9,7 +9,7 @@ import X3DH
 
 final class CryptoTests: XCTestCase {
 
-    let cryptoManager = try! CryptoManager(handshake: nil, encoder: JSONEncoder(), decoder: JSONDecoder())
+    let cryptoManager = try! CryptoManager(cryptoStore: nil, encoder: JSONEncoder(), decoder: JSONDecoder())
     let groupId = UUID(uuidString: "E621E1F8-C36C-495A-93FC-0C247A3E6E5F")!
     let userId = UUID(uuidString: "F621E1F8-C36C-495A-93FC-0C247A3E6E5F")!
 
@@ -177,7 +177,7 @@ final class CryptoTests: XCTestCase {
             // Publish public key material...
 
             let bob = TestUser(userId: UserId())
-            let bobsCryptoManager = try CryptoManager(handshake: nil, encoder: JSONEncoder(), decoder: JSONDecoder())
+            let bobsCryptoManager = try CryptoManager(cryptoStore: nil, encoder: JSONEncoder(), decoder: JSONDecoder())
 
             // Bob gets prekey bundle and remote verification key from server
             let prekeyBundle = PrekeyBundle(identityKey: Bytes(publicKeyMaterial.identityKey), signedPrekey: Bytes(publicKeyMaterial.signedPrekey), prekeySignature: publicKeyMaterial.prekeySignature, oneTimePrekey: Bytes(publicKeyMaterial.oneTimePrekeys.last!))
