@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
 
   s.name          = "LetsMeetCrypto"
-  s.version       = "7.0.1"
+  s.version       = "8.0.0"
   s.summary       = "Crypto to be used in Let's Meet projects."
   s.platform      = :ios, "11.0"
   s.swift_version = "4.2"
