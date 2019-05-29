@@ -17,6 +17,7 @@ public enum CryptoManagerError: LocalizedError {
     case missingMembershipCertificate(member: Member)
     case encryptionError
     case decryptionError
+    case hashingError
     case conversationNotInitialized
     case tokenGenerationFailed
     case invalidKey
@@ -30,6 +31,7 @@ public enum CryptoManagerError: LocalizedError {
         case .missingMembershipCertificate(let member): return "Missing membership certificate for \(member)"
         case .encryptionError: return "Encryption failed"
         case .decryptionError: return "Decryption failed"
+        case .hashingError: return "Hashing failed"
         case .conversationNotInitialized: return "Conversation with user not initialized yet."
         case .tokenGenerationFailed: return "Could not generate token."
         case .invalidKey: return "Invalid key"
