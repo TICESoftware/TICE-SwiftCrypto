@@ -6,10 +6,10 @@ import Foundation
 import LetsMeetModels
 
 public protocol CryptoStore {
-    func save(_ handshakeMaterial: HandshakeMaterial)
-    func loadHandshakeMaterial() -> HandshakeMaterial?
+    func save(_ handshakeMaterial: HandshakeMaterial) throws
+    func loadHandshakeMaterial() throws -> HandshakeMaterial?
 
-    func save(_ conversationState: ConversationState, for userId: UserId)
+    func save(_ conversationState: ConversationState, for userId: UserId) throws
     func loadConversationState(for userId: UserId) -> ConversationState?
-    func loadConversationStates() -> [UserId: ConversationState]
+    func loadConversationStates() throws -> [UserId: ConversationState]?
 }

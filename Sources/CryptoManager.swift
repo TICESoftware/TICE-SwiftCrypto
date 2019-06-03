@@ -12,6 +12,7 @@ import Sodium
 import HKDF
 
 public enum CryptoManagerError: LocalizedError {
+    case initializationFailed(Error)
     case invalidMessageSignature
     case couldNotAccessSignedInUser
     case missingMembershipCertificate(member: Member)
@@ -26,6 +27,7 @@ public enum CryptoManagerError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
+        case .initializationFailed(let error): return "Initialization failed. Reason: \(error)"
         case .invalidMessageSignature: return "Invalid message signature"
         case .couldNotAccessSignedInUser: return "could not access signed in user"
         case .missingMembershipCertificate(let member): return "Missing membership certificate for \(member)"
@@ -65,40 +67,52 @@ public class CryptoManager {
     let maxSkip = 100
     let maxCache = 100
 
-    let handshake: X3DH
+    var handshake: X3DH
     var doubleRatchets: [UserId: DoubleRatchet]
+
     let doubleRatchetsQueue = DispatchQueue(label: "de.anbion.letsmeet.doubleRatchets", attributes: .concurrent)
 
     let cryptoStore: CryptoStore?
     let encoder: JSONEncoder
     let decoder: JSONDecoder
 
-    public init(cryptoStore: CryptoStore?, encoder: JSONEncoder, decoder: JSONDecoder) throws {
+    public init(restoreFrom cryptoStore: CryptoStore, encoder: JSONEncoder, decoder: JSONDecoder) throws {
         self.cryptoStore = cryptoStore
         self.encoder = encoder
         self.decoder = decoder
 
-        if let handshakeMaterial = cryptoStore?.loadHandshakeMaterial() {
+        if let handshakeMaterial = try cryptoStore.loadHandshakeMaterial() {
             let identityKeyPair = KeyExchange.KeyPair(publicKey: Bytes(handshakeMaterial.identityKeyPair.publicKey), secretKey: Bytes(handshakeMaterial.identityKeyPair.privateKey))
             let signedPrekeyPair = KeyExchange.KeyPair(publicKey: Bytes(handshakeMaterial.signedPrekeyPair.publicKey), secretKey: Bytes(handshakeMaterial.signedPrekeyPair.privateKey))
             let oneTimePrekeyPairs = handshakeMaterial.oneTimePrekeyPairs.map { KeyExchange.KeyPair(publicKey: Bytes($0.publicKey), secretKey: Bytes($0.privateKey)) }
 
-            self.handshake = X3DH(identityKeyPair: identityKeyPair, signedPrekeyPair: signedPrekeyPair, oneTimePrekeyPairs: oneTimePrekeyPairs)
+            handshake = X3DH(identityKeyPair: identityKeyPair, signedPrekeyPair: signedPrekeyPair, oneTimePrekeyPairs: oneTimePrekeyPairs)
         } else {
-            self.handshake = try X3DH()
+            do {
+                self.handshake = try X3DH()
+            } catch {
+                throw CryptoManagerError.initializationFailed(error)
+            }
         }
 
-        if let conversationStates = cryptoStore?.loadConversationStates() {
-            self.doubleRatchets = [:]
-            for (userId, conversationState) in conversationStates {
+        self.doubleRatchets = [:]
+        if let conversationStates = try cryptoStore.loadConversationStates() {
+            let loadedDoubleRatchets = try conversationStates.mapValues { conversationState -> DoubleRatchet in
                 let rootChainKeyPair = KeyExchange.KeyPair(publicKey: Bytes(conversationState.rootChainKeyPair.publicKey), secretKey: Bytes(conversationState.rootChainKeyPair.privateKey))
                 let messageKeyCacheState = try decoder.decode(MessageKeyCacheState.self, from: conversationState.messageKeyCache)
                 let sessionState = SessionState(rootKey: Bytes(conversationState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: conversationState.rootChainRemotePublicKey.map { Bytes($0) }, sendingChainKey: conversationState.sendingChainKey.map { Bytes($0) }, receivingChainKey: conversationState.receivingChainKey.map { Bytes($0) }, sendMessageNumber: conversationState.sendMessageNumber, receivedMessageNumber: conversationState.receivedMessageNumber, previousSendingChainLength: conversationState.previousSendingChainLength, messageKeyCacheState: messageKeyCacheState, info: info, maxSkip: maxSkip, maxCache: maxCache)
-                self.set(DoubleRatchet(sessionState: sessionState), for: userId)
+                return DoubleRatchet(sessionState: sessionState)
             }
-        } else {
-            self.doubleRatchets = [:]
+            doubleRatchets.merge(loadedDoubleRatchets, uniquingKeysWith: { (_, new) in new })
         }
+    }
+
+    public init(cryptoStore: CryptoStore?, encoder: JSONEncoder, decoder: JSONDecoder) throws {
+        self.cryptoStore = cryptoStore
+        self.encoder = encoder
+        self.decoder = decoder
+        self.handshake = try X3DH()
+        self.doubleRatchets = [:]
     }
 
     // MARK: Helper
@@ -115,12 +129,12 @@ public class CryptoManager {
 
     // MARK: Persistence
 
-    func saveHandshakeKeyMaterial() {
+    func saveHandshakeKeyMaterial() throws {
         let identityKeyPair = LetsMeetModels.KeyPair(privateKey: Data(handshake.keyMaterial.identityKeyPair.secretKey), publicKey: Data(handshake.keyMaterial.identityKeyPair.publicKey))
         let signedPrekeyPair = LetsMeetModels.KeyPair(privateKey: Data(handshake.keyMaterial.signedPrekeyPair.secretKey), publicKey: Data(handshake.keyMaterial.signedPrekeyPair.publicKey))
         let oneTimePrekeyPairs = handshake.keyMaterial.oneTimePrekeyPairs.map { LetsMeetModels.KeyPair(privateKey: Data($0.secretKey), publicKey: Data($0.publicKey)) }
         let handshakeMaterial = HandshakeMaterial(identityKeyPair: identityKeyPair, signedPrekeyPair: signedPrekeyPair, oneTimePrekeyPairs: oneTimePrekeyPairs)
-        cryptoStore?.save(handshakeMaterial)
+        try cryptoStore?.save(handshakeMaterial)
     }
 
     func saveConversationState(for userId: UserId) throws {
@@ -130,7 +144,7 @@ public class CryptoManager {
         let rootChainKeyPair = LetsMeetModels.KeyPair(privateKey: Data(sessionState.rootChainKeyPair.secretKey), publicKey: Data(sessionState.rootChainKeyPair.publicKey))
         let messageKeyCache = try encoder.encode(sessionState.messageKeyCacheState)
         let conversationState = ConversationState(rootKey: Data(sessionState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: sessionState.rootChainRemotePublicKey.map { Data($0) }, sendingChainKey: sessionState.sendingChainKey.map { Data($0) }, receivingChainKey: sessionState.receivingChainKey.map { Data($0) }, sendMessageNumber: sessionState.sendMessageNumber, receivedMessageNumber: sessionState.receivedMessageNumber, previousSendingChainLength: sessionState.previousSendingChainLength, messageKeyCache: messageKeyCache)
-        cryptoStore?.save(conversationState, for: userId)
+        try cryptoStore?.save(conversationState, for: userId)
     }
 
     // MARK: Key generation
@@ -224,7 +238,7 @@ public class CryptoManager {
         let privateSigningKey = try ECPrivateKey(key: privateSigningKeyString)
         let publicSigningKey = try privateSigningKey.extractPublicKey()
 
-        saveHandshakeKeyMaterial()
+        try saveHandshakeKeyMaterial()
 
         return UserPublicKeys(signingKey: signingKey(from: publicSigningKey.pemString), identityKey: Data(publicKeyMaterial.identityKey), signedPrekey: Data(publicKeyMaterial.signedPrekey), prekeySignature: publicKeyMaterial.prekeySignature, oneTimePrekeys: publicKeyMaterial.oneTimePrekeys.map { Data($0) })
     }
