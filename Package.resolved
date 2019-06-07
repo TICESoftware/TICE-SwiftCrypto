@@ -69,8 +69,8 @@
         "repositoryURL": "git@github.com:AnbionApps/letsmeet-models.git",
         "state": {
           "branch": null,
-          "revision": "7f00885e1cf6aebc89f556edf60c3c27c4419147",
-          "version": "15.0.0"
+          "revision": "8f1075d3e1fd971d4eb80063d02642f30ea3c00c",
+          "version": "16.0.0"
         }
       },
       {
@@ -78,8 +78,8 @@
         "repositoryURL": "https://github.com/IBM-Swift/LoggerAPI.git",
         "state": {
           "branch": null,
-          "revision": "e29073bb7cecf3673e56bcb16180e8fd0cb091f6",
-          "version": "1.8.1"
+          "revision": "3357dd9526cdf9436fa63bb792b669e6efdc43da",
+          "version": "1.9.0"
         }
       },
       {
@@ -89,6 +89,15 @@
           "branch": null,
           "revision": "2783f004ddb4b8ccc1dfc979880e2fe44f284882",
           "version": "3.5.0"
+        }
+      },
+      {
+        "package": "swift-log",
+        "repositoryURL": "https://github.com/apple/swift-log.git",
+        "state": {
+          "branch": null,
+          "revision": "f4240bf022a69815241a883c03645444b58ac553",
+          "version": "1.1.0"
         }
       },
       {
