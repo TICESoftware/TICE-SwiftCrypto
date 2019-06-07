@@ -129,7 +129,7 @@ public class CryptoManager {
 
     // MARK: Persistence
 
-    func saveHandshakeKeyMaterial() throws {
+    private func saveHandshakeKeyMaterial() throws {
         let identityKeyPair = LetsMeetModels.KeyPair(privateKey: Data(handshake.keyMaterial.identityKeyPair.secretKey), publicKey: Data(handshake.keyMaterial.identityKeyPair.publicKey))
         let signedPrekeyPair = LetsMeetModels.KeyPair(privateKey: Data(handshake.keyMaterial.signedPrekeyPair.secretKey), publicKey: Data(handshake.keyMaterial.signedPrekeyPair.publicKey))
         let oneTimePrekeyPairs = handshake.keyMaterial.oneTimePrekeyPairs.map { LetsMeetModels.KeyPair(privateKey: Data($0.secretKey), publicKey: Data($0.publicKey)) }
@@ -137,7 +137,7 @@ public class CryptoManager {
         try cryptoStore?.save(handshakeMaterial)
     }
 
-    func saveConversationState(for userId: UserId) throws {
+    private func saveConversationState(for userId: UserId) throws {
         guard let doubleRatchet = doubleRatchet(for: userId) else { return }
         let sessionState = doubleRatchet.sessionState
 
@@ -251,6 +251,7 @@ public class CryptoManager {
         }
 
         let keyAgreementInitiation = try handshake.initiateKeyAgreement(remotePrekeyBundle: prekeyBundle, prekeySignatureVerifier: { verify(prekeySignature: $0, prekey: Data(prekeyBundle.signedPrekey), verificationPublicKey: remoteSigningKey) }, info: info)
+        try saveHandshakeKeyMaterial()
 
         let doubleRatchet = try DoubleRatchet(keyPair: nil, remotePublicKey: prekeyBundle.signedPrekey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
         set(doubleRatchet, for: userId)
