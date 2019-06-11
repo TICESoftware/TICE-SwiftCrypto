@@ -42,8 +42,8 @@
         "repositoryURL": "git@github.com:AnbionApps/DoubleRatchet.git",
         "state": {
           "branch": null,
-          "revision": "b4e3013b6fa499ffee66a4bd10482fac84b65aee",
-          "version": "1.1.1"
+          "revision": "dd9cf7c1aeb1fe42754cf84e0dc5f44437a3ded1",
+          "version": "1.1.2"
         }
       },
       {
@@ -69,8 +69,8 @@
         "repositoryURL": "git@github.com:AnbionApps/letsmeet-models.git",
         "state": {
           "branch": null,
-          "revision": "8f1075d3e1fd971d4eb80063d02642f30ea3c00c",
-          "version": "16.0.0"
+          "revision": "80332bff17b9d110c521decd1954038ffe076981",
+          "version": "17.0.0"
         }
       },
       {
