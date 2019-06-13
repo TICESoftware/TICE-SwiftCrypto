@@ -47,6 +47,7 @@ public enum CertificateValidationError: LocalizedError {
     case invalidSignature
     case invalidMembership
     case invalidClaims
+    case revoked
     case expired(ValidateClaimsResult)
 
     public var errorDescription: String? {
@@ -54,6 +55,7 @@ public enum CertificateValidationError: LocalizedError {
         case .invalidSignature: return "Invalid signature"
         case .invalidMembership: return "Invalid membership"
         case .invalidClaims: return "Invalid claims"
+        case .revoked: return "Certificate is revoked"
         case .expired(let validateClaimsResult): return "Certificate not valid anymore/yet. \(validateClaimsResult.description)"
         }
     }
