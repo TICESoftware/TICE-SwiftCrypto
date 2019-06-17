@@ -213,6 +213,10 @@ public class CryptoManager {
             throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.invalidMembership)
         }
 
+        guard jwt.claims.iss == issuer else {
+            throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.invalidClaims)
+        }
+
         guard JWT<MembershipClaims>.verify(certificate, using: jwtVerifier) else {
             throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.invalidSignature)
         }
@@ -342,29 +346,29 @@ public class CryptoManager {
         guard let sig = try? ECSignature(asn1: prekeySignature) else { return false }
         return sig.verify(plaintext: Data(prekey), using: verificationPublicKey)
     }
-    
+
     // MARK: Auth signature
-    
+
     public func generateAuthHeader(signingKey: PrivateKey, userId: UserId) throws -> Certificate {
         let issueDate = Date()
         guard let randomBytes = sodium.randomBytes.buf(length: 16) else { throw CryptoManagerError.tokenGenerationFailed }
         let claims = AuthHeaderClaims(iss: userId, iat: issueDate, exp: issueDate.addingTimeInterval(120), nonce: Data(randomBytes))
         var jwt = JWT(claims: claims)
-        
+
         let jwtSigner = JWTSigner.es512(privateKey: signingKey)
         return try jwt.sign(using: jwtSigner)
     }
-    
+
     public func parseAuthHeaderClaims(_ authHeader: Certificate) throws -> UserId {
         let jwt = try JWT<AuthHeaderClaims>(jwtString: authHeader)
-    
+
         let validateClaimsResult = jwt.validateClaims()
         guard validateClaimsResult == .success else {
             throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.expired(validateClaimsResult))
         }
         return jwt.claims.iss
     }
-    
+
     public func verify(authHeader: Certificate, publicKey: LetsMeetModels.PublicKey) -> Bool {
         let jwtVerifier = JWTVerifier.es512(publicKey: publicKey)
         return JWT<AuthHeaderClaims>.verify(authHeader, using: jwtVerifier)

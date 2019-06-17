@@ -14,7 +14,7 @@ public struct MembershipClaims: Claims {
     public let groupId: GroupId
     public let admin: Bool
 
-    public enum Issuer: Codable {
+    public enum Issuer: Codable, Equatable {
         case server
         case user(UserId)
 
