@@ -93,7 +93,7 @@ final class CryptoTests: XCTestCase {
     }
 
     func testValidateExpiredCertificate() {
-        let claims = MembershipClaims(iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(-20), exp: Date().addingTimeInterval(-10), groupId: groupId, admin: true)
+        let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(-20), exp: Date().addingTimeInterval(-10), groupId: groupId, admin: true)
         var jwt = JWT(claims: claims)
 
         let privateKeyData = Data(user.privateSigningKey)
@@ -118,7 +118,7 @@ final class CryptoTests: XCTestCase {
     }
 
     func testValidateCertificateIssuedInFuture() {
-        let claims = MembershipClaims(iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(60), exp: Date().addingTimeInterval(3600), groupId: groupId, admin: true)
+        let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(60), exp: Date().addingTimeInterval(3600), groupId: groupId, admin: true)
         var jwt = JWT(claims: claims)
 
         let privateKeyData = Data(user.privateSigningKey)
@@ -143,7 +143,7 @@ final class CryptoTests: XCTestCase {
     }
 
     func testValidateCertificateInvalidSignature() {
-        let claims = MembershipClaims(iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(60), exp: Date().addingTimeInterval(3600), groupId: groupId, admin: true)
+        let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(60), exp: Date().addingTimeInterval(3600), groupId: groupId, admin: true)
         var jwt = JWT(claims: claims)
 
         guard let privateKeyData = try? ECPrivateKey.make(for: .secp521r1).pemString.data(using: .utf8) else {

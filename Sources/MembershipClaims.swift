@@ -6,7 +6,10 @@ import Foundation
 import LetsMeetModels
 import SwiftJWT
 
+public typealias JWTId = UUID
+
 public struct MembershipClaims: Claims {
+    public let jti: JWTId
     public let iss: Issuer
     public let sub: UserId
     public let iat: Date?
@@ -14,9 +17,18 @@ public struct MembershipClaims: Claims {
     public let groupId: GroupId
     public let admin: Bool
 
-    public enum Issuer: Codable, Equatable {
+    public enum Issuer: Codable, Equatable, CustomStringConvertible {
         case server
         case user(UserId)
+
+        public var description: String {
+            switch self {
+            case .server:
+                return "server"
+            case .user(let userId):
+                return userId.uuidString
+            }
+        }
 
         public enum CodingKeys: String, CodingKey {
             case server
