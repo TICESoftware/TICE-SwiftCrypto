@@ -68,8 +68,8 @@ public class CryptoManager {
     let info = "Let's Meet"
     let maxSkip = 100
     let maxCache = 100
-    let certificatesValidFor: TimeInterval = 60*60*24
-    let certificatesMaxValidInHistory: TimeInterval = 60*60*24
+    let certificatesValidFor: TimeInterval = 60*60*24*30*6
+    let certificatesMaxValidInHistory: TimeInterval = 60*60*24*30*6
 
     var handshake: X3DH
     var doubleRatchets: [UserId: DoubleRatchet]
