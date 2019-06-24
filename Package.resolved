@@ -60,8 +60,8 @@
         "repositoryURL": "https://github.com/IBM-Swift/KituraContracts.git",
         "state": {
           "branch": null,
-          "revision": "4f8237d6fe2cc1593761660dc4d0ab2c516d73eb",
-          "version": "1.1.2"
+          "revision": "bdd4abf3932e11388ab690ea72a43e17b98dfd78",
+          "version": "1.1.3"
         }
       },
       {
@@ -69,8 +69,8 @@
         "repositoryURL": "git@github.com:AnbionApps/letsmeet-models.git",
         "state": {
           "branch": null,
-          "revision": "6e31d9e0be0d8e5970a68b141c8b03ab9b6875b0",
-          "version": "19.1.0"
+          "revision": "db62cc82a2ffc9a0bf650ed356fbacac427bd39f",
+          "version": "20.0.0"
         }
       },
       {
