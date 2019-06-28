@@ -325,12 +325,8 @@ public class CryptoManager {
         let plaintext: Bytes
         do {
             plaintext = try doubleRatchet.decrypt(message: encryptedMessage)
-        } catch {
-            if let drError = error as? DRError,
-                .exceedMaxSkip == drError {
-                throw CryptoManagerError.maxSkipExceeded
-            }
-            throw error
+        } catch DRError.exceedMaxSkip {
+            throw CryptoManagerError.maxSkipExceeded
         }
         try saveConversationState(for: userId)
 
