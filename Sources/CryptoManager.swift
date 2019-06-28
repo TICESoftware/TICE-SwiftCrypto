@@ -20,6 +20,7 @@ public enum CryptoManagerError: LocalizedError {
     case decryptionError
     case hashingError
     case conversationNotInitialized
+    case maxSkipExceeded
     case tokenGenerationFailed
     case invalidKey
     case serializationError(Error)
@@ -35,6 +36,7 @@ public enum CryptoManagerError: LocalizedError {
         case .decryptionError: return "Decryption failed"
         case .hashingError: return "Hashing failed"
         case .conversationNotInitialized: return "Conversation with user not initialized yet."
+        case .maxSkipExceeded: return "Skipped to many messages. Ratchet step required."
         case .tokenGenerationFailed: return "Could not generate token."
         case .invalidKey: return "Invalid key"
         case .serializationError(let error): return error.localizedDescription
@@ -320,7 +322,16 @@ public class CryptoManager {
             throw CryptoManagerError.conversationNotInitialized
         }
 
-        let plaintext = try doubleRatchet.decrypt(message: encryptedMessage)
+        let plaintext: Bytes
+        do {
+            plaintext = try doubleRatchet.decrypt(message: encryptedMessage)
+        } catch {
+            if let drError = error as? DRError,
+                .exceedMaxSkip == drError {
+                throw CryptoManagerError.maxSkipExceeded
+            }
+            throw error
+        }
         try saveConversationState(for: userId)
 
         return Data(plaintext)
