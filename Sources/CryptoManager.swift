@@ -327,7 +327,10 @@ public class CryptoManager {
             plaintext = try doubleRatchet.decrypt(message: encryptedMessage)
         } catch DRError.exceedMaxSkip {
             throw CryptoManagerError.maxSkipExceeded
+        } catch {
+            throw CryptoManagerError.decryptionError
         }
+
         try saveConversationState(for: userId)
 
         return Data(plaintext)
