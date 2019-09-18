@@ -6,8 +6,8 @@
         "repositoryURL": "https://github.com/IBM-Swift/BlueCryptor.git",
         "state": {
           "branch": null,
-          "revision": "6f79b4ea0a7ef8acb08ba3f3e23da32e83acaca3",
-          "version": "1.0.28"
+          "revision": "6e83ae419817e7272f2f80a7a005a26df366dd8e",
+          "version": "1.0.31"
         }
       },
       {
@@ -15,8 +15,8 @@
         "repositoryURL": "https://github.com/IBM-Swift/BlueECC.git",
         "state": {
           "branch": null,
-          "revision": "90ddc2068d79c94e204c8e4aa6379c791e1eb9e8",
-          "version": "1.2.1"
+          "revision": "73a43a5102eafaf4668dbd6e0163bed21c776b9c",
+          "version": "1.2.4"
         }
       },
       {
@@ -24,8 +24,8 @@
         "repositoryURL": "https://github.com/IBM-Swift/BlueRSA.git",
         "state": {
           "branch": null,
-          "revision": "241ea93df2c44f85da3fcf6b704b029b1bcc138d",
-          "version": "1.0.31"
+          "revision": "e906f5e93426bb43ad7ac37cc20008d8fae608d9",
+          "version": "1.0.34"
         }
       },
       {
@@ -69,8 +69,8 @@
         "repositoryURL": "git@github.com:AnbionApps/letsmeet-models.git",
         "state": {
           "branch": null,
-          "revision": "db62cc82a2ffc9a0bf650ed356fbacac427bd39f",
-          "version": "20.0.0"
+          "revision": "b8f9ba4a472c27ecbf0c9969faed83f01e0c65fa",
+          "version": "23.0.0"
         }
       },
       {
@@ -87,8 +87,8 @@
         "repositoryURL": "https://github.com/IBM-Swift/Swift-JWT.git",
         "state": {
           "branch": null,
-          "revision": "2783f004ddb4b8ccc1dfc979880e2fe44f284882",
-          "version": "3.5.0"
+          "revision": "a0a89d62b8276635f430dfaf8688051cac6b9342",
+          "version": "3.5.3"
         }
       },
       {
@@ -96,8 +96,8 @@
         "repositoryURL": "https://github.com/apple/swift-log.git",
         "state": {
           "branch": null,
-          "revision": "f4240bf022a69815241a883c03645444b58ac553",
-          "version": "1.1.0"
+          "revision": "e8aabbe95db22e064ad42f1a4a9f8982664c70ed",
+          "version": "1.1.1"
         }
       },
       {
