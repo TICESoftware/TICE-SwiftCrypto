@@ -3,7 +3,7 @@
 //
 
 import Foundation
-import LetsMeetModels
+import TICEModels
 import SwiftJWT
 import CryptorECC
 import X3DH
@@ -36,7 +36,7 @@ public enum CryptoManagerError: LocalizedError {
         case .decryptionError: return "Decryption failed"
         case .hashingError: return "Hashing failed"
         case .conversationNotInitialized: return "Conversation with user not initialized yet."
-        case .maxSkipExceeded: return "Skipped to many messages. Ratchet step required."
+        case .maxSkipExceeded: return "Skipped too many messages. Ratchet step required."
         case .tokenGenerationFailed: return "Could not generate token."
         case .invalidKey: return "Invalid key"
         case .serializationError(let error): return error.localizedDescription
@@ -67,7 +67,7 @@ public class CryptoManager {
 
     let sodium = Sodium()
 
-    let info = "Let's Meet"
+    let info = "TICE"
     let maxSkip = 100
     let maxCache = 100
     let certificatesValidFor: TimeInterval = 60*60*24*30*6
@@ -76,7 +76,7 @@ public class CryptoManager {
     var handshake: X3DH
     var doubleRatchets: [UserId: DoubleRatchet]
 
-    let doubleRatchetsQueue = DispatchQueue(label: "de.anbion.letsmeet.doubleRatchets", attributes: .concurrent)
+    let doubleRatchetsQueue = DispatchQueue(label: "de.anbion.tice.doubleRatchets", attributes: .concurrent)
 
     let cryptoStore: CryptoStore?
     let encoder: JSONEncoder
@@ -136,9 +136,9 @@ public class CryptoManager {
     // MARK: Persistence
 
     private func saveHandshakeKeyMaterial() throws {
-        let identityKeyPair = LetsMeetModels.KeyPair(privateKey: Data(handshake.keyMaterial.identityKeyPair.secretKey), publicKey: Data(handshake.keyMaterial.identityKeyPair.publicKey))
-        let signedPrekeyPair = LetsMeetModels.KeyPair(privateKey: Data(handshake.keyMaterial.signedPrekeyPair.secretKey), publicKey: Data(handshake.keyMaterial.signedPrekeyPair.publicKey))
-        let oneTimePrekeyPairs = handshake.keyMaterial.oneTimePrekeyPairs.map { LetsMeetModels.KeyPair(privateKey: Data($0.secretKey), publicKey: Data($0.publicKey)) }
+        let identityKeyPair = TICEModels.KeyPair(privateKey: Data(handshake.keyMaterial.identityKeyPair.secretKey), publicKey: Data(handshake.keyMaterial.identityKeyPair.publicKey))
+        let signedPrekeyPair = TICEModels.KeyPair(privateKey: Data(handshake.keyMaterial.signedPrekeyPair.secretKey), publicKey: Data(handshake.keyMaterial.signedPrekeyPair.publicKey))
+        let oneTimePrekeyPairs = handshake.keyMaterial.oneTimePrekeyPairs.map { TICEModels.KeyPair(privateKey: Data($0.secretKey), publicKey: Data($0.publicKey)) }
         let handshakeMaterial = HandshakeMaterial(identityKeyPair: identityKeyPair, signedPrekeyPair: signedPrekeyPair, oneTimePrekeyPairs: oneTimePrekeyPairs)
         try cryptoStore?.save(handshakeMaterial)
     }
@@ -147,7 +147,7 @@ public class CryptoManager {
         guard let doubleRatchet = doubleRatchet(for: userId) else { return }
         let sessionState = doubleRatchet.sessionState
 
-        let rootChainKeyPair = LetsMeetModels.KeyPair(privateKey: Data(sessionState.rootChainKeyPair.secretKey), publicKey: Data(sessionState.rootChainKeyPair.publicKey))
+        let rootChainKeyPair = TICEModels.KeyPair(privateKey: Data(sessionState.rootChainKeyPair.secretKey), publicKey: Data(sessionState.rootChainKeyPair.publicKey))
         let messageKeyCache = try encoder.encode(sessionState.messageKeyCacheState)
         let conversationState = ConversationState(rootKey: Data(sessionState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: sessionState.rootChainRemotePublicKey.map { Data($0) }, sendingChainKey: sessionState.sendingChainKey.map { Data($0) }, receivingChainKey: sessionState.receivingChainKey.map { Data($0) }, sendMessageNumber: sessionState.sendMessageNumber, receivedMessageNumber: sessionState.receivedMessageNumber, previousSendingChainLength: sessionState.previousSendingChainLength, messageKeyCache: messageKeyCache)
         try cryptoStore?.save(conversationState, for: userId)
@@ -155,11 +155,11 @@ public class CryptoManager {
 
     // MARK: Key generation
 
-    public func generateSigningKeyPair() throws -> LetsMeetModels.KeyPair {
+    public func generateSigningKeyPair() throws -> TICEModels.KeyPair {
         let privateSigningKey = try ECPrivateKey.make(for: .secp521r1)
         let publicSigningKey = try privateSigningKey.extractPublicKey()
 
-        return LetsMeetModels.KeyPair(privateKey: signingKey(from: privateSigningKey.pemString), publicKey: signingKey(from: publicSigningKey.pemString))
+        return TICEModels.KeyPair(privateKey: signingKey(from: privateSigningKey.pemString), publicKey: signingKey(from: publicSigningKey.pemString))
     }
 
     public func signingKeyString(from key: Data) throws -> String {
@@ -202,11 +202,11 @@ public class CryptoManager {
         try validate(certificate: certificate, membership: membership, issuer: .user(issuer.userId), publicKey: issuer.publicSigningKey)
     }
 
-    public func validateServerSignedMembershipCertificate(certificate: Certificate, membership: Membership, publicKey: LetsMeetModels.PublicKey) throws {
+    public func validateServerSignedMembershipCertificate(certificate: Certificate, membership: Membership, publicKey: TICEModels.PublicKey) throws {
         try validate(certificate: certificate, membership: membership, issuer: .server, publicKey: publicKey)
     }
 
-    private func validate(certificate: Certificate, membership: Membership, issuer: MembershipClaims.Issuer, publicKey: LetsMeetModels.PublicKey) throws {
+    private func validate(certificate: Certificate, membership: Membership, issuer: MembershipClaims.Issuer, publicKey: TICEModels.PublicKey) throws {
         let jwtVerifier = JWTVerifier.es512(publicKey: publicKey)
 
         let jwt = try JWT<MembershipClaims>(jwtString: certificate)
@@ -253,7 +253,7 @@ public class CryptoManager {
         return UserPublicKeys(signingKey: signingKey(from: publicSigningKey.pemString), identityKey: Data(publicKeyMaterial.identityKey), signedPrekey: Data(publicKeyMaterial.signedPrekey), prekeySignature: publicKeyMaterial.prekeySignature, oneTimePrekeys: publicKeyMaterial.oneTimePrekeys.map { Data($0) })
     }
 
-    public func initConversation(with userId: UserId, remoteIdentityKey: LetsMeetModels.PublicKey, remoteSignedPrekey: LetsMeetModels.PublicKey, remotePrekeySignature: Signature, remoteOneTimePrekey: LetsMeetModels.PublicKey?, remoteSigningKey: LetsMeetModels.PublicKey) throws -> ConversationInvitation {
+    public func initConversation(with userId: UserId, remoteIdentityKey: TICEModels.PublicKey, remoteSignedPrekey: TICEModels.PublicKey, remotePrekeySignature: Signature, remoteOneTimePrekey: TICEModels.PublicKey?, remoteSigningKey: TICEModels.PublicKey) throws -> ConversationInvitation {
         let prekeyBundle = PrekeyBundle(identityKey: Bytes(remoteIdentityKey), signedPrekey: Bytes(remoteSignedPrekey), prekeySignature: remotePrekeySignature, oneTimePrekey: remoteOneTimePrekey.map { Bytes($0) })
         guard let remoteSigningKeyPemString = Bytes(remoteSigningKey).utf8String,
             let remoteSigningKey = try? ECPublicKey(key: remoteSigningKeyPemString) else {
@@ -345,7 +345,7 @@ public class CryptoManager {
 
     // MARK: Sign / verify
 
-    private func sign(prekey: LetsMeetModels.PublicKey, with signer: Signer) throws -> Signature {
+    private func sign(prekey: TICEModels.PublicKey, with signer: Signer) throws -> Signature {
         guard let privateKeyString = Bytes(signer.privateSigningKey).utf8String else {
             throw CryptoManagerError.invalidKey
         }
@@ -354,7 +354,7 @@ public class CryptoManager {
         return sig.asn1
     }
 
-    private func verify(prekeySignature: Signature, prekey: LetsMeetModels.PublicKey, verificationPublicKey: ECPublicKey) -> Bool {
+    private func verify(prekeySignature: Signature, prekey: TICEModels.PublicKey, verificationPublicKey: ECPublicKey) -> Bool {
         guard let sig = try? ECSignature(asn1: prekeySignature) else { return false }
         return sig.verify(plaintext: Data(prekey), using: verificationPublicKey)
     }
@@ -381,7 +381,7 @@ public class CryptoManager {
         return jwt.claims.iss
     }
 
-    public func verify(authHeader: Certificate, publicKey: LetsMeetModels.PublicKey) -> Bool {
+    public func verify(authHeader: Certificate, publicKey: TICEModels.PublicKey) -> Bool {
         let jwtVerifier = JWTVerifier.es512(publicKey: publicKey)
         return JWT<AuthHeaderClaims>.verify(authHeader, using: jwtVerifier)
     }

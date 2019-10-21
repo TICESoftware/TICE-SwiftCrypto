@@ -3,7 +3,7 @@
 //
 
 import Foundation
-import LetsMeetModels
+import TICEModels
 import SwiftJWT
 
 public struct AuthHeaderClaims: Claims {

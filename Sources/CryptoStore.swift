@@ -3,7 +3,7 @@
 //
 
 import Foundation
-import LetsMeetModels
+import TICEModels
 
 public protocol CryptoStore {
     func save(_ handshakeMaterial: HandshakeMaterial) throws

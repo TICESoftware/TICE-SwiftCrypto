@@ -4,17 +4,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "LetsMeetCrypto",
+    name: "TICECrypto",
     platforms: [
         .macOS(.v10_14), .iOS(.v12),
     ],
     products: [
         .library(
-            name: "LetsMeetCrypto",
-            targets: ["LetsMeetCrypto"]),
+            name: "TICECrypto",
+            targets: ["TICECrypto"]),
     ],
     dependencies: [
-        .package(url: "git@github.com:AnbionApps/letsmeet-models.git", Version(19,0,0)...Version(27,0,0)),
+        .package(url: "git@github.com:AnbionApps/tice-models.git", Version(19,0,0)...Version(28,0,0)),
         .package(url: "https://github.com/IBM-Swift/Swift-JWT.git", from: "3.4.1"),
         .package(url: "https://github.com/IBM-Swift/BlueECC.git", from: "1.2.1"),
         .package(url: "git@github.com:AnbionApps/X3DH.git", from: "1.0.0"),
@@ -22,11 +22,11 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "LetsMeetCrypto",
-            dependencies: ["LetsMeetModels", "SwiftJWT", "CryptorECC", "X3DH", "DoubleRatchet"],
+            name: "TICECrypto",
+            dependencies: ["TICEModels", "SwiftJWT", "CryptorECC", "X3DH", "DoubleRatchet"],
             path: "Sources"),
         .testTarget(
-            name: "LetsMeetCryptoTests",
-            dependencies: ["LetsMeetCrypto", "LetsMeetModels", "SwiftJWT", "CryptorECC", "DoubleRatchet", "X3DH"]),
+            name: "TICECryptoTests",
+            dependencies: ["TICECrypto", "TICEModels", "SwiftJWT", "CryptorECC", "DoubleRatchet", "X3DH"]),
     ]
 )

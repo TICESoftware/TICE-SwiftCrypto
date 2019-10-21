@@ -4,8 +4,8 @@ import CryptorECC
 import Sodium
 import DoubleRatchet
 import X3DH
-@testable import LetsMeetModels
-@testable import LetsMeetCrypto
+@testable import TICEModels
+@testable import TICECrypto
 
 final class CryptoTests: XCTestCase {
 

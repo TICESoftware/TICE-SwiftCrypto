@@ -3,7 +3,7 @@
 //
 
 import CryptorECC
-import LetsMeetModels
+import TICEModels
 
 public protocol Signer {
     var privateSigningKey: PrivateKey { get }

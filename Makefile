@@ -8,13 +8,13 @@ update: Package.resolved
 Package.resolved: Package.swift
 	swift package update
 
-xcode: LetsMeetCrypto.xcodeproj
-LetsMeetCrypto.xcodeproj: Package.resolved
+xcode: TICECrypto.xcodeproj
+TICECrypto.xcodeproj: Package.resolved
 	swift package generate-xcodeproj --xcconfig-overrides config.xcconfig
 
 dev: update xcode
 
-lint: Sources Package.swift LetsMeetCrypto.podspec
+lint: Sources Package.swift TICECrypto.podspec
 	./lint.sh $(version)
 
 version: lint
