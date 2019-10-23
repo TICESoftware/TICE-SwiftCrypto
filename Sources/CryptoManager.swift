@@ -76,7 +76,7 @@ public class CryptoManager {
     var handshake: X3DH
     var doubleRatchets: [UserId: DoubleRatchet]
 
-    let doubleRatchetsQueue = DispatchQueue(label: "de.anbion.tice.doubleRatchets", attributes: .concurrent)
+    let doubleRatchetsQueue = DispatchQueue(label: "com.ticeapp.TICE.doubleRatchets", attributes: .concurrent)
 
     let cryptoStore: CryptoStore?
     let encoder: JSONEncoder
