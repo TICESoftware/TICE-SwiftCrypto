@@ -17,7 +17,7 @@ public enum CryptoManagerError: LocalizedError {
     case couldNotAccessSignedInUser
     case missingMembershipCertificate(member: Member)
     case encryptionError
-    case decryptionError
+    case decryptionError(Error?)
     case hashingError
     case conversationNotInitialized
     case maxSkipExceeded
@@ -33,7 +33,7 @@ public enum CryptoManagerError: LocalizedError {
         case .couldNotAccessSignedInUser: return "could not access signed in user"
         case .missingMembershipCertificate(let member): return "Missing membership certificate for \(member)"
         case .encryptionError: return "Encryption failed"
-        case .decryptionError: return "Decryption failed"
+        case .decryptionError(let error): return "Decryption failed. Reason: \(error?.localizedDescription ?? "None")"
         case .hashingError: return "Hashing failed"
         case .conversationNotInitialized: return "Conversation with user not initialized yet."
         case .maxSkipExceeded: return "Skipped too many messages. Ratchet step required."
@@ -255,12 +255,15 @@ public class CryptoManager {
 
     public func initConversation(with userId: UserId, remoteIdentityKey: TICEModels.PublicKey, remoteSignedPrekey: TICEModels.PublicKey, remotePrekeySignature: Signature, remoteOneTimePrekey: TICEModels.PublicKey?, remoteSigningKey: TICEModels.PublicKey) throws -> ConversationInvitation {
         let prekeyBundle = PrekeyBundle(identityKey: Bytes(remoteIdentityKey), signedPrekey: Bytes(remoteSignedPrekey), prekeySignature: remotePrekeySignature, oneTimePrekey: remoteOneTimePrekey.map { Bytes($0) })
-        guard let remoteSigningKeyPemString = Bytes(remoteSigningKey).utf8String,
-            let remoteSigningKey = try? ECPublicKey(key: remoteSigningKeyPemString) else {
-                throw CryptoManagerError.invalidKey
+        guard let remoteSigningKeyPemString = Bytes(remoteSigningKey).utf8String else {
+            throw CryptoManagerError.invalidKey
         }
+        let remoteSigningKey = try ECPublicKey(key: remoteSigningKeyPemString)
 
-        let keyAgreementInitiation = try handshake.initiateKeyAgreement(remotePrekeyBundle: prekeyBundle, prekeySignatureVerifier: { verify(prekeySignature: $0, prekey: Data(prekeyBundle.signedPrekey), verificationPublicKey: remoteSigningKey) }, info: info)
+        let verifier: PrekeySignatureVerifier = { signature throws in
+            try self.verify(prekeySignature: signature, prekey: Data(prekeyBundle.signedPrekey), verificationPublicKey: remoteSigningKey)
+        }
+        let keyAgreementInitiation = try handshake.initiateKeyAgreement(remotePrekeyBundle: prekeyBundle, prekeySignatureVerifier: verifier, info: info)
         try saveHandshakeKeyMaterial()
 
         let doubleRatchet = try DoubleRatchet(keyPair: nil, remotePublicKey: prekeyBundle.signedPrekey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
@@ -295,7 +298,7 @@ public class CryptoManager {
 
     public func decrypt(encryptedData: Ciphertext, secretKey: SecretKey) throws -> Data {
         guard let plaintext = sodium.aead.xchacha20poly1305ietf.decrypt(nonceAndAuthenticatedCipherText: Bytes(encryptedData), secretKey: Bytes(secretKey)) else {
-            throw CryptoManagerError.decryptionError
+            throw CryptoManagerError.decryptionError(nil)
         }
         return Data(plaintext)
     }
@@ -328,7 +331,7 @@ public class CryptoManager {
         } catch DRError.exceedMaxSkip {
             throw CryptoManagerError.maxSkipExceeded
         } catch {
-            throw CryptoManagerError.decryptionError
+            throw CryptoManagerError.decryptionError(error)
         }
 
         try saveConversationState(for: userId)
@@ -354,8 +357,8 @@ public class CryptoManager {
         return sig.asn1
     }
 
-    private func verify(prekeySignature: Signature, prekey: TICEModels.PublicKey, verificationPublicKey: ECPublicKey) -> Bool {
-        guard let sig = try? ECSignature(asn1: prekeySignature) else { return false }
+    private func verify(prekeySignature: Signature, prekey: TICEModels.PublicKey, verificationPublicKey: ECPublicKey) throws -> Bool {
+        let sig = try ECSignature(asn1: prekeySignature)
         return sig.verify(plaintext: Data(prekey), using: verificationPublicKey)
     }
 
