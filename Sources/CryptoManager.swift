@@ -11,6 +11,8 @@ import DoubleRatchet
 import Sodium
 import HKDF
 
+public typealias ConversationFingerprint = Int
+
 public enum CryptoManagerError: LocalizedError {
     case initializationFailed(Error)
     case invalidMessageSignature
@@ -279,6 +281,15 @@ public class CryptoManager {
         let doubleRatchet = try DoubleRatchet(keyPair: handshake.signedPrekeyPair, remotePublicKey: nil, sharedSecret: sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
         set(doubleRatchet, for: userId)
         try saveConversationState(for: userId)
+    }
+
+    public func conversationExisting(userId: UserId) -> Bool {
+        return doubleRatchets.keys.contains(userId)
+    }
+
+    public func conversationFingerprint(ciphertext: Ciphertext) throws -> ConversationFingerprint {
+        let encryptedMessage = try decoder.decode(Message.self, from: ciphertext)
+        return encryptedMessage.header.publicKey.hashValue
     }
 
     // MARK: Encryption / Decryption
