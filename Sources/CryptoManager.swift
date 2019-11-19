@@ -195,7 +195,7 @@ public class CryptoManager {
         let claims = MembershipClaims(jti: jwtId, iss: issuer, sub: userId, iat: issueDate, exp: issueDate.addingTimeInterval(certificatesValidFor), groupId: groupId, admin: admin)
         var jwt = JWT(claims: claims)
 
-        let jwtSigner = JWTSigner.es512(privateKey: signingKey)
+        let jwtSigner = JWTSigner.es512(privateKey: signingKey, signatureType: .asn1)
 
         return try jwt.sign(using: jwtSigner)
     }
@@ -209,7 +209,7 @@ public class CryptoManager {
     }
 
     private func validate(certificate: Certificate, membership: Membership, issuer: MembershipClaims.Issuer, publicKey: TICEModels.PublicKey) throws {
-        let jwtVerifier = JWTVerifier.es512(publicKey: publicKey)
+        let jwtVerifier = JWTVerifier.es512(publicKey: publicKey, signatureType: .asn1)
 
         let jwt = try JWT<MembershipClaims>(jwtString: certificate)
 
@@ -381,7 +381,7 @@ public class CryptoManager {
         let claims = AuthHeaderClaims(iss: userId, iat: issueDate, exp: issueDate.addingTimeInterval(120), nonce: Data(randomBytes))
         var jwt = JWT(claims: claims)
 
-        let jwtSigner = JWTSigner.es512(privateKey: signingKey)
+        let jwtSigner = JWTSigner.es512(privateKey: signingKey, signatureType: .asn1)
         return try jwt.sign(using: jwtSigner)
     }
 
@@ -396,7 +396,7 @@ public class CryptoManager {
     }
 
     public func verify(authHeader: Certificate, publicKey: TICEModels.PublicKey) -> Bool {
-        let jwtVerifier = JWTVerifier.es512(publicKey: publicKey)
+        let jwtVerifier = JWTVerifier.es512(publicKey: publicKey, signatureType: .asn1)
         return JWT<AuthHeaderClaims>.verify(authHeader, using: jwtVerifier)
     }
 }

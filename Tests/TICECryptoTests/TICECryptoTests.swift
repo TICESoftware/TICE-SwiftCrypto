@@ -79,7 +79,7 @@ final class CryptoTests: XCTestCase {
         var jwt = JWT(claims: claims)
 
         let privateKeyData = Data(user.privateSigningKey)
-        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData)
+        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData, signatureType: .asn1)
         let certificate = try jwt.sign(using: jwtSigner)
 
         do {
@@ -100,7 +100,7 @@ final class CryptoTests: XCTestCase {
         var jwt = JWT(claims: claims)
 
         let privateKeyData = Data(user.privateSigningKey)
-        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData)
+        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData, signatureType: .asn1)
         let certificate = try jwt.sign(using: jwtSigner)
 
         do {
@@ -125,7 +125,7 @@ final class CryptoTests: XCTestCase {
             return
         }
 
-        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData)
+        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData, signatureType: .asn1)
         let certificate = try jwt.sign(using: jwtSigner)
 
         do {
