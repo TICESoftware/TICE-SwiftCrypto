@@ -77,9 +77,9 @@
         "package": "SwiftJWT",
         "repositoryURL": "https://github.com/AnbionApps/Swift-JWT.git",
         "state": {
-          "branch": "ecdsaSignatureType",
-          "revision": "19bfc1abb8f94e96d744ee8d15f1f7ae5bb23e0d",
-          "version": null
+          "branch": null,
+          "revision": "54fab0d209fdb2ab2666cba01a138537bccaa39c",
+          "version": "3.6.1"
         }
       },
       {
@@ -105,8 +105,8 @@
         "repositoryURL": "git@github.com:AnbionApps/tice-models.git",
         "state": {
           "branch": null,
-          "revision": "59dfd6810eb24e6738dfb932b7d586a538cdcda2",
-          "version": "32.0.0"
+          "revision": "be5d4e26bbdb0283f9345b79ff90ea379b0d6b9e",
+          "version": "33.0.0"
         }
       },
       {
