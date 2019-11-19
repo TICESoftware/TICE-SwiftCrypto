@@ -42,8 +42,8 @@
         "repositoryURL": "git@github.com:AnbionApps/DoubleRatchet.git",
         "state": {
           "branch": null,
-          "revision": "41344ddafb3a875c3a303643c3f474cf1db5be2e",
-          "version": "1.1.4"
+          "revision": "6943091d160b3f84e91bd80c2b87a60454542fe2",
+          "version": "1.1.6"
         }
       },
       {
@@ -75,11 +75,11 @@
       },
       {
         "package": "SwiftJWT",
-        "repositoryURL": "https://github.com/IBM-Swift/Swift-JWT.git",
+        "repositoryURL": "https://github.com/AnbionApps/Swift-JWT.git",
         "state": {
-          "branch": null,
-          "revision": "2241e8371092c12ed2095de2ad06ce27103eba53",
-          "version": "3.6.0"
+          "branch": "ecdsaSignatureType",
+          "revision": "19bfc1abb8f94e96d744ee8d15f1f7ae5bb23e0d",
+          "version": null
         }
       },
       {
@@ -105,8 +105,8 @@
         "repositoryURL": "git@github.com:AnbionApps/tice-models.git",
         "state": {
           "branch": null,
-          "revision": "a742d35cc3aae6433fc1477f30fd01d38534648b",
-          "version": "31.0.0"
+          "revision": "59dfd6810eb24e6738dfb932b7d586a538cdcda2",
+          "version": "32.0.0"
         }
       },
       {
@@ -114,8 +114,8 @@
         "repositoryURL": "git@github.com:AnbionApps/X3DH.git",
         "state": {
           "branch": null,
-          "revision": "517f5355aee398e3aa471deb568d230cc3c08cac",
-          "version": "1.0.6"
+          "revision": "d3d85d0051a76b2e33ff82197cdff9aba8a73e54",
+          "version": "1.1.0"
         }
       }
     ]
