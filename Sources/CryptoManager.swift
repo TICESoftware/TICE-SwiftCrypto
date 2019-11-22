@@ -209,7 +209,7 @@ public class CryptoManager {
     }
 
     private func validate(certificate: Certificate, membership: Membership, issuer: MembershipClaims.Issuer, publicKey: TICEModels.PublicKey) throws {
-        let jwtVerifier = JWTVerifier.es512(publicKey: publicKey, signatureType: .asn1)
+        let jwtVerifier = JWTVerifier.es512(publicKey: publicKey, signatureType: signatureType(of: certificate))
 
         let jwt = try JWT<MembershipClaims>(jwtString: certificate)
 
@@ -396,7 +396,15 @@ public class CryptoManager {
     }
 
     public func verify(authHeader: Certificate, publicKey: TICEModels.PublicKey) -> Bool {
-        let jwtVerifier = JWTVerifier.es512(publicKey: publicKey, signatureType: .asn1)
+        let jwtVerifier = JWTVerifier.es512(publicKey: publicKey, signatureType: signatureType(of: authHeader))
         return JWT<AuthHeaderClaims>.verify(authHeader, using: jwtVerifier)
+    }
+}
+
+public func signatureType(of jwt: Certificate) -> ECSignatureType {
+    if let signature = jwt.components(separatedBy: ".").last, signature.count > 178 {
+        return .asn1
+    } else {
+        return .rs
     }
 }
