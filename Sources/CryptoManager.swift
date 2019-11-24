@@ -11,7 +11,7 @@ import DoubleRatchet
 import Sodium
 import HKDF
 
-public typealias ConversationFingerprint = Int
+public typealias ConversationFingerprint = String
 
 public enum CryptoManagerError: LocalizedError {
     case initializationFailed(Error)
@@ -289,7 +289,7 @@ public class CryptoManager {
 
     public func conversationFingerprint(ciphertext: Ciphertext) throws -> ConversationFingerprint {
         let encryptedMessage = try decoder.decode(Message.self, from: ciphertext)
-        return encryptedMessage.header.publicKey.hashValue
+        return Data(encryptedMessage.header.publicKey).base64EncodedString()
     }
 
     // MARK: Encryption / Decryption
