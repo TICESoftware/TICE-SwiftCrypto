@@ -9,7 +9,7 @@ public protocol CryptoStore {
     func save(_ handshakeMaterial: HandshakeMaterial) throws
     func loadHandshakeMaterial() throws -> HandshakeMaterial?
 
-    func save(_ conversationState: ConversationState, for userId: UserId) throws
-    func loadConversationState(for userId: UserId) -> ConversationState?
-    func loadConversationStates() throws -> [UserId: ConversationState]?
+    func save(_ conversationState: ConversationState, for conversation: Conversation) throws
+    func loadConversationState(for conversation: Conversation) -> ConversationState?
+    func loadConversationStates() throws -> [Conversation: ConversationState]?
 }

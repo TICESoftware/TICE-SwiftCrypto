@@ -12,6 +12,7 @@ import Sodium
 import HKDF
 
 public typealias ConversationFingerprint = String
+public typealias ConversationId = UUID
 
 public enum CryptoManagerError: LocalizedError {
     case initializationFailed(Error)
@@ -65,6 +66,16 @@ public enum CertificateValidationError: LocalizedError {
     }
 }
 
+public struct Conversation: Hashable, Codable {
+    public let userId: UserId
+    public let conversationId: ConversationId
+
+    public init(userId: UserId, conversationId: ConversationId) {
+        self.userId = userId
+        self.conversationId = conversationId
+    }
+}
+
 public class CryptoManager {
 
     let sodium = Sodium()
@@ -76,7 +87,7 @@ public class CryptoManager {
     let certificatesMaxValidInHistory: TimeInterval = 60*60*24*30*6
 
     var handshake: X3DH
-    @SynchronizedProperty var doubleRatchets: [UserId: DoubleRatchet]
+    @SynchronizedProperty var doubleRatchets: [Conversation: DoubleRatchet]
 
     let cryptoStore: CryptoStore?
     let encoder: JSONEncoder
@@ -123,18 +134,18 @@ public class CryptoManager {
         try cryptoStore?.save(handshakeMaterial)
     }
 
-    private func saveConversationState(for userId: UserId) throws {
-        guard let doubleRatchet = doubleRatchets[userId] else { return }
+    private func saveConversationState(for conversation: Conversation) throws {
+        guard let doubleRatchet = doubleRatchets[conversation] else { return }
         let sessionState = doubleRatchet.sessionState
 
         let rootChainKeyPair = TICEModels.KeyPair(privateKey: Data(sessionState.rootChainKeyPair.secretKey), publicKey: Data(sessionState.rootChainKeyPair.publicKey))
         let messageKeyCache = try encoder.encode(sessionState.messageKeyCacheState)
         let conversationState = ConversationState(rootKey: Data(sessionState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: sessionState.rootChainRemotePublicKey.map { Data($0) }, sendingChainKey: sessionState.sendingChainKey.map { Data($0) }, receivingChainKey: sessionState.receivingChainKey.map { Data($0) }, sendMessageNumber: sessionState.sendMessageNumber, receivedMessageNumber: sessionState.receivedMessageNumber, previousSendingChainLength: sessionState.previousSendingChainLength, messageKeyCache: messageKeyCache)
-        try cryptoStore?.save(conversationState, for: userId)
+        try cryptoStore?.save(conversationState, for: conversation)
     }
 
     public func reloadConversationStates() throws {
-        var doubleRatchets: [UserId: DoubleRatchet] = [:]
+        var doubleRatchets: [Conversation: DoubleRatchet] = [:]
         if let conversationStates = try cryptoStore?.loadConversationStates() {
             let loadedDoubleRatchets = try conversationStates.mapValues { conversationState -> DoubleRatchet in
                 let rootChainKeyPair = KeyExchange.KeyPair(publicKey: Bytes(conversationState.rootChainKeyPair.publicKey), secretKey: Bytes(conversationState.rootChainKeyPair.privateKey))
@@ -247,7 +258,7 @@ public class CryptoManager {
         return UserPublicKeys(signingKey: signingKey(from: publicSigningKey.pemString), identityKey: Data(publicKeyMaterial.identityKey), signedPrekey: Data(publicKeyMaterial.signedPrekey), prekeySignature: publicKeyMaterial.prekeySignature, oneTimePrekeys: publicKeyMaterial.oneTimePrekeys.map { Data($0) })
     }
 
-    public func initConversation(with userId: UserId, remoteIdentityKey: TICEModels.PublicKey, remoteSignedPrekey: TICEModels.PublicKey, remotePrekeySignature: Signature, remoteOneTimePrekey: TICEModels.PublicKey?, remoteSigningKey: TICEModels.PublicKey) throws -> ConversationInvitation {
+    public func initConversation(with userId: UserId, conversationId: ConversationId, remoteIdentityKey: TICEModels.PublicKey, remoteSignedPrekey: TICEModels.PublicKey, remotePrekeySignature: Signature, remoteOneTimePrekey: TICEModels.PublicKey?, remoteSigningKey: TICEModels.PublicKey) throws -> ConversationInvitation {
         let prekeyBundle = PrekeyBundle(identityKey: Bytes(remoteIdentityKey), signedPrekey: Bytes(remoteSignedPrekey), prekeySignature: remotePrekeySignature, oneTimePrekey: remoteOneTimePrekey.map { Bytes($0) })
         guard let remoteSigningKeyPemString = Bytes(remoteSigningKey).utf8String else {
             throw CryptoManagerError.invalidKey
@@ -261,22 +272,25 @@ public class CryptoManager {
         try saveHandshakeKeyMaterial()
 
         let doubleRatchet = try DoubleRatchet(keyPair: nil, remotePublicKey: prekeyBundle.signedPrekey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
-        doubleRatchets[userId] = doubleRatchet
-        try saveConversationState(for: userId)
+        let conversation = Conversation(userId: userId, conversationId: conversationId)
+        doubleRatchets[conversation] = doubleRatchet
+        try saveConversationState(for: conversation)
 
         return ConversationInvitation(identityKey: Data(keyAgreementInitiation.identityPublicKey), ephemeralKey: Data(keyAgreementInitiation.ephemeralPublicKey), usedOneTimePrekey: keyAgreementInitiation.usedOneTimePrekey.map { Data($0) })
     }
 
-    public func processConversationInvitation(_ conversationInvitation: ConversationInvitation, from userId: UserId) throws {
+    public func processConversationInvitation(_ conversationInvitation: ConversationInvitation, from userId: UserId, conversationId: ConversationId) throws {
         let sharedSecret = try handshake.sharedSecretFromKeyAgreement(remoteIdentityPublicKey: Bytes(conversationInvitation.identityKey), remoteEphemeralPublicKey: Bytes(conversationInvitation.ephemeralKey), usedOneTimePrekey: conversationInvitation.usedOneTimePrekey.map { Bytes($0) }, info: info)
 
         let doubleRatchet = try DoubleRatchet(keyPair: handshake.signedPrekeyPair, remotePublicKey: nil, sharedSecret: sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
-        doubleRatchets[userId] = doubleRatchet
-        try saveConversationState(for: userId)
+        let conversation = Conversation(userId: userId, conversationId: conversationId)
+        doubleRatchets[conversation] = doubleRatchet
+        try saveConversationState(for: conversation)
     }
 
-    public func conversationExisting(userId: UserId) -> Bool {
-        return doubleRatchets.keys.contains(userId)
+    public func conversationExisting(userId: UserId, conversationId: ConversationId) -> Bool {
+        let conversation = Conversation(userId: userId, conversationId: conversationId)
+        return doubleRatchets.keys.contains(conversation)
     }
 
     public func conversationFingerprint(ciphertext: Ciphertext) throws -> ConversationFingerprint {
@@ -306,25 +320,27 @@ public class CryptoManager {
         return Data(plaintext)
     }
 
-    public func encrypt(_ data: Data, for userId: UserId) throws -> Ciphertext {
-        guard let doubleRatchet = doubleRatchets[userId] else {
+    public func encrypt(_ data: Data, for userId: UserId, conversationId: ConversationId) throws -> Ciphertext {
+        let conversation = Conversation(userId: userId, conversationId: conversationId)
+        guard let doubleRatchet = doubleRatchets[conversation] else {
             throw CryptoManagerError.conversationNotInitialized
         }
 
         let message = try doubleRatchet.encrypt(plaintext: Bytes(data))
-        try saveConversationState(for: userId)
+        try saveConversationState(for: conversation)
 
         return try encoder.encode(message)
     }
 
-    private func decrypt(encryptedSecretKey: Ciphertext, from userId: UserId) throws -> SecretKey {
-        let messageKeyData = try decrypt(encryptedMessage: encryptedSecretKey, from: userId)
+    private func decrypt(encryptedSecretKey: Ciphertext, from userId: UserId, conversationId: ConversationId) throws -> SecretKey {
+        let messageKeyData = try decrypt(encryptedMessage: encryptedSecretKey, from: userId, conversationId: conversationId)
         return SecretKey(messageKeyData)
     }
 
-    public func decrypt(encryptedMessage: Ciphertext, from userId: UserId) throws -> Data {
+    public func decrypt(encryptedMessage: Ciphertext, from userId: UserId, conversationId: ConversationId) throws -> Data {
         let encryptedMessage = try decoder.decode(Message.self, from: encryptedMessage)
-        guard let doubleRatchet = doubleRatchets[userId] else {
+        let conversation = Conversation(userId: userId, conversationId: conversationId)
+        guard let doubleRatchet = doubleRatchets[conversation] else {
             throw CryptoManagerError.conversationNotInitialized
         }
 
@@ -337,13 +353,13 @@ public class CryptoManager {
             throw CryptoManagerError.decryptionError(error)
         }
 
-        try saveConversationState(for: userId)
+        try saveConversationState(for: conversation)
 
         return Data(plaintext)
     }
 
-    public func decrypt(encryptedData: Ciphertext, encryptedSecretKey: Ciphertext, from userId: UserId) throws -> Data {
-        let secretKey = try decrypt(encryptedSecretKey: encryptedSecretKey, from: userId)
+    public func decrypt(encryptedData: Ciphertext, encryptedSecretKey: Ciphertext, from userId: UserId, conversationId: ConversationId) throws -> Data {
+        let secretKey = try decrypt(encryptedSecretKey: encryptedSecretKey, from: userId, conversationId: conversationId)
         let plaintext = try decrypt(encryptedData: encryptedData, secretKey: secretKey)
 
         return plaintext
