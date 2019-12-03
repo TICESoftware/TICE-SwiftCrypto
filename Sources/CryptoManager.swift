@@ -83,8 +83,9 @@ public class CryptoManager {
     let info = "TICE"
     let maxSkip = 100
     let maxCache = 100
-    let certificatesValidFor: TimeInterval = 60*60*24*30*6
-    let certificatesMaxValidInHistory: TimeInterval = 60*60*24*30*6
+    public let certificatesValidFor: TimeInterval = 60*60*24*30*6
+    public let certificatesMaxValidInHistory: TimeInterval = 60*60*24*30*6
+    public let jwtValidationLeeway: TimeInterval = 3
 
     var handshake: X3DH
     @SynchronizedProperty var doubleRatchets: [Conversation: DoubleRatchet]
@@ -230,7 +231,7 @@ public class CryptoManager {
             throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.invalidSignature)
         }
 
-        let validateClaimsResult = jwt.validateClaims()
+        let validateClaimsResult = jwt.validateClaims(leeway: jwtValidationLeeway)
         guard validateClaimsResult == .success else {
             throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.expired(validateClaimsResult))
         }
@@ -396,7 +397,7 @@ public class CryptoManager {
     public func parseAuthHeaderClaims(_ authHeader: Certificate) throws -> UserId {
         let jwt = try JWT<AuthHeaderClaims>(jwtString: authHeader)
 
-        let validateClaimsResult = jwt.validateClaims()
+        let validateClaimsResult = jwt.validateClaims(leeway: jwtValidationLeeway)
         guard validateClaimsResult == .success else {
             throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.expired(validateClaimsResult))
         }
