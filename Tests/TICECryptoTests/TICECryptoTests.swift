@@ -150,16 +150,17 @@ final class CryptoTests: XCTestCase {
 
         // Bob gets prekey bundle and remote verification key from server
         let prekeyBundle = PrekeyBundle(identityKey: Bytes(publicKeyMaterial.identityKey), signedPrekey: Bytes(publicKeyMaterial.signedPrekey), prekeySignature: publicKeyMaterial.prekeySignature, oneTimePrekey: Bytes(publicKeyMaterial.oneTimePrekeys.last!))
-        let invitation = try bobsCryptoManager.initConversation(with: userId, remoteIdentityKey: Data(prekeyBundle.identityKey), remoteSignedPrekey: Data(prekeyBundle.signedPrekey), remotePrekeySignature: prekeyBundle.prekeySignature, remoteOneTimePrekey: prekeyBundle.oneTimePrekey.map { Data($0) }, remoteSigningKey: user.publicSigningKey)
+        let conversationId = ConversationId()
+        let invitation = try bobsCryptoManager.initConversation(with: userId, conversationId: conversationId, remoteIdentityKey: Data(prekeyBundle.identityKey), remoteSignedPrekey: Data(prekeyBundle.signedPrekey), remotePrekeySignature: prekeyBundle.prekeySignature, remoteOneTimePrekey: prekeyBundle.oneTimePrekey.map { Data($0) }, remoteSigningKey: user.publicSigningKey)
 
         // Invitation is transmitted...
 
-        try cryptoManager.processConversationInvitation(invitation, from: bob.userId)
+        try cryptoManager.processConversationInvitation(invitation, from: bob.userId, conversationId: conversationId)
 
         let firstMessagePayload = "Hello!".data(using: .utf8)!
-        let firstMessage = try bobsCryptoManager.encrypt(firstMessagePayload, for: userId)
+        let firstMessage = try bobsCryptoManager.encrypt(firstMessagePayload, for: userId, conversationId: conversationId)
 
-        let plaintextData = try cryptoManager.decrypt(encryptedMessage: firstMessage, from: bob.userId)
+        let plaintextData = try cryptoManager.decrypt(encryptedMessage: firstMessage, from: bob.userId, conversationId: conversationId)
 
         XCTAssertEqual(firstMessagePayload, plaintextData, "Invalid decrypted plaintext")
     }
@@ -169,21 +170,22 @@ final class CryptoTests: XCTestCase {
         let bobsCryptoManager = try CryptoManager(cryptoStore: nil, encoder: JSONEncoder(), decoder: JSONDecoder())
 
         let handshakeInfo = try cryptoManager.generatePublicHandshakeInfo(signer: user)
-        let invitation = try bobsCryptoManager.initConversation(with: user.userId, remoteIdentityKey: handshakeInfo.identityKey, remoteSignedPrekey: handshakeInfo.signedPrekey, remotePrekeySignature: handshakeInfo.prekeySignature, remoteOneTimePrekey: handshakeInfo.oneTimePrekeys.last!, remoteSigningKey: user.publicSigningKey)
+        let conversationId = ConversationId()
+        let invitation = try bobsCryptoManager.initConversation(with: user.userId, conversationId: conversationId, remoteIdentityKey: handshakeInfo.identityKey, remoteSignedPrekey: handshakeInfo.signedPrekey, remotePrekeySignature: handshakeInfo.prekeySignature, remoteOneTimePrekey: handshakeInfo.oneTimePrekeys.last!, remoteSigningKey: user.publicSigningKey)
 
-        try cryptoManager.processConversationInvitation(invitation, from: bob.userId)
+        try cryptoManager.processConversationInvitation(invitation, from: bob.userId, conversationId: conversationId)
 
         // Produce maxSkip messages that will get lost
         for _ in 0...100 {
-            _ = try bobsCryptoManager.encrypt(Data(), for: userId)
+            _ = try bobsCryptoManager.encrypt(Data(), for: userId, conversationId: conversationId)
         }
 
         // Produce another message that is going to be delivered successfully
-        var encryptedMessage = try bobsCryptoManager.encrypt(Data(), for: userId)
+        var encryptedMessage = try bobsCryptoManager.encrypt(Data(), for: userId, conversationId: conversationId)
 
         let exp1 = expectation(description: "maxSkipExceeded error raised")
         do {
-            _ = try cryptoManager.decrypt(encryptedMessage: encryptedMessage, from: bob.userId)
+            _ = try cryptoManager.decrypt(encryptedMessage: encryptedMessage, from: bob.userId, conversationId: conversationId)
         } catch CryptoManagerError.maxSkipExceeded {
             exp1.fulfill()
         }
@@ -194,12 +196,12 @@ final class CryptoTests: XCTestCase {
         // BEGIN: Show that ratchet step isn't going to resolve the problem
         //
         let exp2 = expectation(description: "maxSkipExceeded error raised second time")
-        encryptedMessage = try cryptoManager.encrypt(Data(), for: bob.userId)
-        _ = try bobsCryptoManager.decrypt(encryptedMessage: encryptedMessage, from: user.userId)
+        encryptedMessage = try cryptoManager.encrypt(Data(), for: bob.userId, conversationId: conversationId)
+        _ = try bobsCryptoManager.decrypt(encryptedMessage: encryptedMessage, from: user.userId, conversationId: conversationId)
 
-        encryptedMessage = try bobsCryptoManager.encrypt(Data(), for: userId)
+        encryptedMessage = try bobsCryptoManager.encrypt(Data(), for: userId, conversationId: conversationId)
         do {
-            _ = try cryptoManager.decrypt(encryptedMessage: encryptedMessage, from: bob.userId)
+            _ = try cryptoManager.decrypt(encryptedMessage: encryptedMessage, from: bob.userId, conversationId: conversationId)
         } catch CryptoManagerError.maxSkipExceeded {
             exp2.fulfill()
         }
@@ -210,14 +212,14 @@ final class CryptoTests: XCTestCase {
 
         // Recover by reinitializing conversation
         let newHandshakeInfo = try bobsCryptoManager.generatePublicHandshakeInfo(signer: bob)
-        let newInvitation = try cryptoManager.initConversation(with: bob.userId, remoteIdentityKey: newHandshakeInfo.identityKey, remoteSignedPrekey: newHandshakeInfo.signedPrekey, remotePrekeySignature: newHandshakeInfo.prekeySignature, remoteOneTimePrekey: newHandshakeInfo.oneTimePrekeys.last!, remoteSigningKey: bob.publicSigningKey)
+        let newInvitation = try cryptoManager.initConversation(with: bob.userId, conversationId: conversationId, remoteIdentityKey: newHandshakeInfo.identityKey, remoteSignedPrekey: newHandshakeInfo.signedPrekey, remotePrekeySignature: newHandshakeInfo.prekeySignature, remoteOneTimePrekey: newHandshakeInfo.oneTimePrekeys.last!, remoteSigningKey: bob.publicSigningKey)
 
-        try bobsCryptoManager.processConversationInvitation(newInvitation, from: user.userId)
-        encryptedMessage = try cryptoManager.encrypt(Data(), for: bob.userId)
-        _ = try bobsCryptoManager.decrypt(encryptedMessage: encryptedMessage, from: user.userId)
+        try bobsCryptoManager.processConversationInvitation(newInvitation, from: user.userId, conversationId: conversationId)
+        encryptedMessage = try cryptoManager.encrypt(Data(), for: bob.userId, conversationId: conversationId)
+        _ = try bobsCryptoManager.decrypt(encryptedMessage: encryptedMessage, from: user.userId, conversationId: conversationId)
 
-        encryptedMessage = try bobsCryptoManager.encrypt(Data(), for: user.userId)
-        _ = try cryptoManager.decrypt(encryptedMessage: encryptedMessage, from: bob.userId)
+        encryptedMessage = try bobsCryptoManager.encrypt(Data(), for: user.userId, conversationId: conversationId)
+        _ = try cryptoManager.decrypt(encryptedMessage: encryptedMessage, from: bob.userId, conversationId: conversationId)
     }
 
     static var allTests = [

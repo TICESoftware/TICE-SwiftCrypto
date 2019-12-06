@@ -14,10 +14,16 @@ TICECrypto.xcodeproj: Package.resolved
 
 dev: update xcode
 
+build: Sources Package.swift TICECrypto.podspec
+	swift build
+
+test: Sources Package.swift TICECrypto.podspec
+	swift test
+
 lint: Sources Package.swift TICECrypto.podspec
 	./lint.sh $(version)
 
-version: lint
+version: build lint test
 	git push
 	git push --tags
 	pod repo push --allow-warnings AnbionPods

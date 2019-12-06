@@ -42,8 +42,8 @@
         "repositoryURL": "git@github.com:AnbionApps/DoubleRatchet.git",
         "state": {
           "branch": null,
-          "revision": "826db4b75dbd5bb751bfc0ef47dae8899590253b",
-          "version": "1.1.7"
+          "revision": "41344ddafb3a875c3a303643c3f474cf1db5be2e",
+          "version": "1.1.4"
         }
       },
       {
@@ -105,8 +105,8 @@
         "repositoryURL": "git@github.com:AnbionApps/tice-models.git",
         "state": {
           "branch": null,
-          "revision": "be5d4e26bbdb0283f9345b79ff90ea379b0d6b9e",
-          "version": "33.0.0"
+          "revision": "a742d35cc3aae6433fc1477f30fd01d38534648b",
+          "version": "31.0.0"
         }
       },
       {
