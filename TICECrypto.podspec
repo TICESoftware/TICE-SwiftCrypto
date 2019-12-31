@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
 
   s.name          = "TICECrypto"
-  s.version       = "25.0.5"
+  s.version       = "25.0.6"
   s.summary       = "Crypto to be used in TICE projects."
   s.platform      = :ios, "11.0"
   s.swift_version = "5.1"

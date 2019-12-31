@@ -14,7 +14,7 @@ let package = Package(
             targets: ["TICECrypto"]),
     ],
     dependencies: [
-        .package(url: "git@github.com:AnbionApps/tice-models.git", Version(19,0,0)..<Version(39,0,0)),
+        .package(url: "git@github.com:AnbionApps/tice-models.git", Version(19,0,0)..<Version(40,0,0)),
         .package(url: "https://github.com/AnbionApps/Swift-JWT.git", from: "3.6.0"),
         .package(url: "https://github.com/IBM-Swift/BlueECC.git", from: "1.2.1"),
         .package(url: "git@github.com:AnbionApps/X3DH.git", from: "1.1.0"),
