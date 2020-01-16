@@ -39,20 +39,20 @@
       },
       {
         "package": "DoubleRatchet",
-        "repositoryURL": "git@github.com:AnbionApps/DoubleRatchet.git",
+        "repositoryURL": "git@github.com:TICESoftware/DoubleRatchet.git",
         "state": {
           "branch": null,
-          "revision": "826db4b75dbd5bb751bfc0ef47dae8899590253b",
-          "version": "1.1.7"
+          "revision": "2a8aa0a0ab57184bb8dcc587f78334d713f8d8a8",
+          "version": "1.1.8"
         }
       },
       {
         "package": "HKDF",
-        "repositoryURL": "git@github.com:AnbionApps/HKDF.git",
+        "repositoryURL": "git@github.com:TICESoftware/HKDF.git",
         "state": {
           "branch": null,
-          "revision": "1041b589cb7b033892d61666ec3894a902321938",
-          "version": "1.0.1"
+          "revision": "b222816c923e02dd896637e824f67b5e225629b4",
+          "version": "1.0.2"
         }
       },
       {
@@ -75,7 +75,7 @@
       },
       {
         "package": "SwiftJWT",
-        "repositoryURL": "https://github.com/AnbionApps/Swift-JWT.git",
+        "repositoryURL": "https://github.com/TICESoftware/Swift-JWT.git",
         "state": {
           "branch": null,
           "revision": "54fab0d209fdb2ab2666cba01a138537bccaa39c",
@@ -102,20 +102,20 @@
       },
       {
         "package": "TICEModels",
-        "repositoryURL": "git@github.com:AnbionApps/tice-models.git",
+        "repositoryURL": "git@github.com:TICESoftware/tice-models.git",
         "state": {
           "branch": null,
-          "revision": "d0b019d8dcfe0ecb3de3a046045a66979e264dbb",
-          "version": "42.0.0"
+          "revision": "f79531e52e59ec78faf4bba2db034d9582b0714f",
+          "version": "42.1.1"
         }
       },
       {
         "package": "X3DH",
-        "repositoryURL": "git@github.com:AnbionApps/X3DH.git",
+        "repositoryURL": "git@github.com:TICESoftware/X3DH.git",
         "state": {
           "branch": null,
-          "revision": "d3d85d0051a76b2e33ff82197cdff9aba8a73e54",
-          "version": "1.1.0"
+          "revision": "23bf1b5d2d003a94e057027c0178d1304a5ce964",
+          "version": "1.1.1"
         }
       }
     ]

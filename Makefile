@@ -15,10 +15,10 @@ TICECrypto.xcodeproj: Package.resolved
 dev: update xcode
 
 build: Sources Package.swift TICECrypto.podspec
-	swift build
+	swift build -Xcc -Ilibsodium-osx/include -Xlinker -Llibsodium-osx/lib
 
 test: Sources Package.swift TICECrypto.podspec
-	swift test
+	swift test -Xcc -Ilibsodium-osx/include -Xlinker -Llibsodium-osx/lib
 
 lint: Sources Package.swift TICECrypto.podspec
 	./lint.sh $(version)
