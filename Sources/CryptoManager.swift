@@ -161,6 +161,10 @@ public class CryptoManager {
 
     // MARK: Key generation
 
+    public func generateDatabaseKey(length: Int) -> String? {
+        sodium.randomBytes.buf(length: length).flatMap { sodium.utils.bin2hex($0) }
+    }
+
     public func generateSigningKeyPair() throws -> TICEModels.KeyPair {
         let privateSigningKey = try ECPrivateKey.make(for: .secp521r1)
         let publicSigningKey = try privateSigningKey.extractPublicKey()

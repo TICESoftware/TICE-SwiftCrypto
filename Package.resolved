@@ -24,8 +24,8 @@
         "repositoryURL": "https://github.com/IBM-Swift/BlueRSA.git",
         "state": {
           "branch": null,
-          "revision": "e906f5e93426bb43ad7ac37cc20008d8fae608d9",
-          "version": "1.0.34"
+          "revision": "8ea901f2582296837d88f882b0fa5a0601759598",
+          "version": "1.0.35"
         }
       },
       {
@@ -105,8 +105,8 @@
         "repositoryURL": "git@github.com:TICESoftware/tice-models.git",
         "state": {
           "branch": null,
-          "revision": "f79531e52e59ec78faf4bba2db034d9582b0714f",
-          "version": "42.1.1"
+          "revision": "0956aca32307c945818f3109fbfc8677355d6522",
+          "version": "43.0.0"
         }
       },
       {
