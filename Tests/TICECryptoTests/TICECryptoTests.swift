@@ -244,4 +244,8 @@ class TestUser: User, Signer {
         let publicSigningKey = try! signingKey.extractPublicKey().pemString.bytes
         super.init(userId: userId, publicSigningKey: Data(publicSigningKey), publicName: nil)
     }
+
+    required init(from decoder: Decoder) throws {
+        fatalError("init(from:) has not been implemented")
+    }
 }

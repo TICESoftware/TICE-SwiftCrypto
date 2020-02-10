@@ -12,7 +12,6 @@ import Sodium
 import HKDF
 
 public typealias ConversationFingerprint = String
-public typealias ConversationId = UUID
 
 public enum CryptoManagerError: LocalizedError {
     case initializationFailed(Error)
@@ -141,28 +140,30 @@ public class CryptoManager {
 
         let rootChainKeyPair = TICEModels.KeyPair(privateKey: Data(sessionState.rootChainKeyPair.secretKey), publicKey: Data(sessionState.rootChainKeyPair.publicKey))
         let messageKeyCache = try encoder.encode(sessionState.messageKeyCacheState)
-        let conversationState = ConversationState(rootKey: Data(sessionState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: sessionState.rootChainRemotePublicKey.map { Data($0) }, sendingChainKey: sessionState.sendingChainKey.map { Data($0) }, receivingChainKey: sessionState.receivingChainKey.map { Data($0) }, sendMessageNumber: sessionState.sendMessageNumber, receivedMessageNumber: sessionState.receivedMessageNumber, previousSendingChainLength: sessionState.previousSendingChainLength, messageKeyCache: messageKeyCache)
-        try cryptoStore?.save(conversationState, for: conversation)
+        let conversationState = ConversationState(userId: conversation.userId, conversationId: conversation.conversationId, rootKey: Data(sessionState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: sessionState.rootChainRemotePublicKey.map { Data($0) }, sendingChainKey: sessionState.sendingChainKey.map { Data($0) }, receivingChainKey: sessionState.receivingChainKey.map { Data($0) }, sendMessageNumber: sessionState.sendMessageNumber, receivedMessageNumber: sessionState.receivedMessageNumber, previousSendingChainLength: sessionState.previousSendingChainLength, messageKeyCache: messageKeyCache)
+        try cryptoStore?.save(conversationState)
     }
 
     public func reloadConversationStates() throws {
         var doubleRatchets: [Conversation: DoubleRatchet] = [:]
         if let conversationStates = try cryptoStore?.loadConversationStates() {
-            let loadedDoubleRatchets = try conversationStates.mapValues { conversationState -> DoubleRatchet in
+            for conversationState in conversationStates {
                 let rootChainKeyPair = KeyExchange.KeyPair(publicKey: Bytes(conversationState.rootChainKeyPair.publicKey), secretKey: Bytes(conversationState.rootChainKeyPair.privateKey))
                 let messageKeyCacheState = try decoder.decode(MessageKeyCacheState.self, from: conversationState.messageKeyCache)
                 let sessionState = SessionState(rootKey: Bytes(conversationState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: conversationState.rootChainRemotePublicKey.map { Bytes($0) }, sendingChainKey: conversationState.sendingChainKey.map { Bytes($0) }, receivingChainKey: conversationState.receivingChainKey.map { Bytes($0) }, sendMessageNumber: conversationState.sendMessageNumber, receivedMessageNumber: conversationState.receivedMessageNumber, previousSendingChainLength: conversationState.previousSendingChainLength, messageKeyCacheState: messageKeyCacheState, info: info, maxSkip: maxSkip, maxCache: maxCache)
-                return DoubleRatchet(sessionState: sessionState)
+
+                let conversation = Conversation(userId: conversationState.userId, conversationId: conversationState.conversationId)
+                let doubleRatchet = DoubleRatchet(sessionState: sessionState)
+                doubleRatchets[conversation] = doubleRatchet
             }
-            doubleRatchets.merge(loadedDoubleRatchets, uniquingKeysWith: { (_, new) in new })
         }
         self.doubleRatchets = doubleRatchets
     }
 
     // MARK: Key generation
 
-    public func generateDatabaseKey(length: Int) -> String? {
-        sodium.randomBytes.buf(length: length).flatMap { sodium.utils.bin2hex($0) }
+    public func generateDatabaseKey(length: Int) -> SecretKey? {
+        sodium.randomBytes.buf(length: length).map { SecretKey($0) }
     }
 
     public func generateSigningKeyPair() throws -> TICEModels.KeyPair {
