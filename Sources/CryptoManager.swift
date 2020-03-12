@@ -17,7 +17,6 @@ public enum CryptoManagerError: LocalizedError {
     case initializationFailed(Error)
     case invalidMessageSignature
     case couldNotAccessSignedInUser
-    case missingMembershipCertificate(member: Member)
     case encryptionError
     case decryptionError(Error?)
     case hashingError
@@ -33,7 +32,6 @@ public enum CryptoManagerError: LocalizedError {
         case .initializationFailed(let error): return "Initialization failed. Reason: \(error)"
         case .invalidMessageSignature: return "Invalid message signature"
         case .couldNotAccessSignedInUser: return "could not access signed in user"
-        case .missingMembershipCertificate(let member): return "Missing membership certificate for \(member)"
         case .encryptionError: return "Encryption failed"
         case .decryptionError(let error): return "Decryption failed. Reason: \(error?.localizedDescription ?? "None")"
         case .hashingError: return "Hashing failed"

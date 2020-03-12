@@ -14,7 +14,7 @@ final class CryptoTests: XCTestCase {
     let userId = UUID(uuidString: "F621E1F8-C36C-495A-93FC-0C247A3E6E5F")!
 
     lazy var user: TestUser = { TestUser(userId: userId) }()
-    lazy var membership: Membership = { Membership(userId: self.userId, publicSigningKey: self.user.publicSigningKey, groupId: self.groupId, admin: true) }()
+    lazy var membership: Membership = { Membership(userId: self.userId, publicSigningKey: self.user.publicSigningKey, groupId: self.groupId, admin: true, serverSignedMembershipCertificate: "serverSignedCertificate") }()
 
     func testUserSignedMembershipCertificate() throws {
         let certificate = try cryptoManager.createUserSignedMembershipCertificate(userId: userId, groupId: groupId, admin: true, signerUserId: userId, signer: user)
