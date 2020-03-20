@@ -1,7 +1,6 @@
 import XCTest
 import SwiftJWT
 import CryptorECC
-import Sodium
 import DoubleRatchet
 import X3DH
 @testable import TICEModels
@@ -9,7 +8,7 @@ import X3DH
 
 final class CryptoTests: XCTestCase {
 
-    let cryptoManager = try! CryptoManager(cryptoStore: nil, encoder: JSONEncoder(), decoder: JSONDecoder())
+    let cryptoManager = CryptoManager(cryptoStore: TestCryptoStore(), encoder: JSONEncoder(), decoder: JSONDecoder())
     let groupId = UUID(uuidString: "E621E1F8-C36C-495A-93FC-0C247A3E6E5F")!
     let userId = UUID(uuidString: "F621E1F8-C36C-495A-93FC-0C247A3E6E5F")!
 
@@ -141,17 +140,18 @@ final class CryptoTests: XCTestCase {
     }
 
     func testInitializeConversation() throws {
-        let publicKeyMaterial = try cryptoManager.generatePublicHandshakeInfo(signer: user)
+        let publicKeyMaterial = try cryptoManager.generateHandshakeKeyMaterial(signer: user)
 
         // Publish public key material...
 
         let bob = TestUser(userId: UserId())
-        let bobsCryptoManager = try CryptoManager(cryptoStore: nil, encoder: JSONEncoder(), decoder: JSONDecoder())
+        let bobsCryptoManager = CryptoManager(cryptoStore: TestCryptoStore(), encoder: JSONEncoder(), decoder: JSONDecoder())
+        _ = try bobsCryptoManager.generateHandshakeKeyMaterial(signer: bob)
 
         // Bob gets prekey bundle and remote verification key from server
-        let prekeyBundle = PrekeyBundle(identityKey: Bytes(publicKeyMaterial.identityKey), signedPrekey: Bytes(publicKeyMaterial.signedPrekey), prekeySignature: publicKeyMaterial.prekeySignature, oneTimePrekey: Bytes(publicKeyMaterial.oneTimePrekeys.last!))
+
         let conversationId = ConversationId()
-        let invitation = try bobsCryptoManager.initConversation(with: userId, conversationId: conversationId, remoteIdentityKey: Data(prekeyBundle.identityKey), remoteSignedPrekey: Data(prekeyBundle.signedPrekey), remotePrekeySignature: prekeyBundle.prekeySignature, remoteOneTimePrekey: prekeyBundle.oneTimePrekey.map { Data($0) }, remoteSigningKey: user.publicSigningKey)
+        let invitation = try bobsCryptoManager.initConversation(with: userId, conversationId: conversationId, remoteIdentityKey: publicKeyMaterial.identityKey, remoteSignedPrekey: publicKeyMaterial.signedPrekey, remotePrekeySignature: publicKeyMaterial.prekeySignature, remoteOneTimePrekey: publicKeyMaterial.oneTimePrekeys.first!, remoteSigningKey: user.publicSigningKey)
 
         // Invitation is transmitted...
 
@@ -167,9 +167,10 @@ final class CryptoTests: XCTestCase {
 
     func testMaxSkipExceeded() throws {
         let bob = TestUser(userId: UserId())
-        let bobsCryptoManager = try CryptoManager(cryptoStore: nil, encoder: JSONEncoder(), decoder: JSONDecoder())
+        let bobsCryptoManager = CryptoManager(cryptoStore: TestCryptoStore(), encoder: JSONEncoder(), decoder: JSONDecoder())
+        _ = try bobsCryptoManager.generateHandshakeKeyMaterial(signer: bob)
 
-        let handshakeInfo = try cryptoManager.generatePublicHandshakeInfo(signer: user)
+        let handshakeInfo = try cryptoManager.generateHandshakeKeyMaterial(signer: user)
         let conversationId = ConversationId()
         let invitation = try bobsCryptoManager.initConversation(with: user.userId, conversationId: conversationId, remoteIdentityKey: handshakeInfo.identityKey, remoteSignedPrekey: handshakeInfo.signedPrekey, remotePrekeySignature: handshakeInfo.prekeySignature, remoteOneTimePrekey: handshakeInfo.oneTimePrekeys.last!, remoteSigningKey: user.publicSigningKey)
 
@@ -211,7 +212,7 @@ final class CryptoTests: XCTestCase {
         //
 
         // Recover by reinitializing conversation
-        let newHandshakeInfo = try bobsCryptoManager.generatePublicHandshakeInfo(signer: bob)
+        let newHandshakeInfo = try bobsCryptoManager.generateHandshakeKeyMaterial(signer: bob)
         let newInvitation = try cryptoManager.initConversation(with: bob.userId, conversationId: conversationId, remoteIdentityKey: newHandshakeInfo.identityKey, remoteSignedPrekey: newHandshakeInfo.signedPrekey, remotePrekeySignature: newHandshakeInfo.prekeySignature, remoteOneTimePrekey: newHandshakeInfo.oneTimePrekeys.last!, remoteSigningKey: bob.publicSigningKey)
 
         try bobsCryptoManager.processConversationInvitation(newInvitation, from: user.userId, conversationId: conversationId)
@@ -247,5 +248,74 @@ class TestUser: User, Signer {
 
     required init(from decoder: Decoder) throws {
         fatalError("init(from:) has not been implemented")
+    }
+}
+
+enum TestCryptoStoreError: Error {
+    case noKeys
+}
+
+class TestCryptoStore: CryptoStore {
+    var identityKeyPair: TICEModels.KeyPair?
+    var prekeyPair: TICEModels.KeyPair?
+    var prekeySignature: Signature?
+    var oneTimePrekeyPairs: [TICEModels.PublicKey: TICEModels.KeyPair] = [:]
+
+    func saveIdentityKeyPair(_ keyPair: TICEModels.KeyPair) throws {
+        identityKeyPair = keyPair
+    }
+
+    func savePrekeyPair(_ keyPair: TICEModels.KeyPair, signature: Signature) throws {
+        prekeyPair = keyPair
+        prekeySignature = signature
+    }
+
+    func saveOneTimePrekeyPairs(_ keyPairs: [TICEModels.KeyPair]) throws {
+        for keyPair in keyPairs {
+            oneTimePrekeyPairs[keyPair.publicKey] = keyPair
+        }
+    }
+
+    func loadIdentityKeyPair() throws -> TICEModels.KeyPair {
+        guard let identityKeyPair = identityKeyPair else {
+            throw TestCryptoStoreError.noKeys
+        }
+        return identityKeyPair
+    }
+
+    func loadPrekeyPair() throws -> TICEModels.KeyPair {
+        guard let prekeyPair = prekeyPair else {
+            throw TestCryptoStoreError.noKeys
+        }
+        return prekeyPair
+    }
+
+    func loadPrekeySignature() throws -> Signature {
+        guard let signature = prekeySignature else {
+            throw TestCryptoStoreError.noKeys
+        }
+        return signature
+    }
+
+    func loadPrivateOneTimePrekey(publicKey: TICEModels.PublicKey) throws -> PrivateKey {
+        guard let keyPair = oneTimePrekeyPairs[publicKey] else {
+            throw TestCryptoStoreError.noKeys
+        }
+        return keyPair.privateKey
+    }
+
+    func deleteOneTimePrekeyPair(publicKey: TICEModels.PublicKey) throws {
+        oneTimePrekeyPairs.removeValue(forKey: publicKey)
+    }
+
+    func save(_ conversationState: ConversationState) throws {
+    }
+
+    func loadConversationState(userId: UserId, conversationId: ConversationId) throws -> ConversationState? {
+        nil
+    }
+
+    func loadConversationStates() throws -> [ConversationState] {
+        []
     }
 }
