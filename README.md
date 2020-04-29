@@ -1,3 +1,3 @@
-# Crypto
+# TICE Crypto
 
-A description of this package.
+This module provides the cryptographic operations used in the TICE client for iOS and the backend.

@@ -39,7 +39,7 @@
       },
       {
         "package": "DoubleRatchet",
-        "repositoryURL": "git@github.com:TICESoftware/DoubleRatchet.git",
+        "repositoryURL": "https://github.com/TICESoftware/DoubleRatchet.git",
         "state": {
           "branch": null,
           "revision": "f40332fc3dd3274458a8f5bd0ccfd16aad9fe168",
@@ -51,8 +51,8 @@
         "repositoryURL": "git@github.com:TICESoftware/HKDF.git",
         "state": {
           "branch": null,
-          "revision": "b222816c923e02dd896637e824f67b5e225629b4",
-          "version": "1.0.2"
+          "revision": "19491ada43f28d42affd513224c6ec776969c656",
+          "version": "1.0.4"
         }
       },
       {
@@ -102,16 +102,16 @@
       },
       {
         "package": "TICEModels",
-        "repositoryURL": "git@github.com:TICESoftware/tice-models.git",
+        "repositoryURL": "https://github.com/TICESoftware/TICE-SwiftModels.git",
         "state": {
           "branch": null,
-          "revision": "f0634705fba63890c793b36da0f3104e6df6d486",
-          "version": "46.0.0"
+          "revision": "f6d1a23966a3b5e98c6ddf5188baf11f6daf2217",
+          "version": "46.0.1"
         }
       },
       {
         "package": "X3DH",
-        "repositoryURL": "git@github.com:TICESoftware/X3DH.git",
+        "repositoryURL": "https://github.com/TICESoftware/X3DH.git",
         "state": {
           "branch": null,
           "revision": "71af884845e99de0f8e0b4467809a4cf3d4198d9",

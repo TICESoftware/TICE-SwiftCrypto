@@ -26,4 +26,4 @@ lint: Sources Package.swift TICECrypto.podspec
 version: build lint test
 	git push
 	git push --tags
-	pod repo push --allow-warnings AnbionPods
+	pod repo push AnbionPods
