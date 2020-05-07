@@ -139,6 +139,65 @@ final class CryptoTests: XCTestCase {
         }
     }
 
+    func testValidateCertificateDeprecatedIssuerFormat() throws {
+        struct DeprecatedMembershipClaims: Claims {
+            public let jti: JWTId
+            public let iss: DeprecatedIssuer
+            public let sub: UserId
+            public let iat: Date?
+            public let exp: Date?
+            public let groupId: GroupId
+            public let admin: Bool
+
+            public enum DeprecatedIssuer: Codable {
+                case server
+                case user(UserId)
+
+                public enum CodingKeys: String, CodingKey {
+                    case server
+                    case user
+                }
+
+                public init(from decoder: Decoder) throws {
+                    XCTFail("Should not have been called")
+                    throw NSError()
+                }
+
+                public func encode(to encoder: Encoder) throws {
+                    var container = encoder.container(keyedBy: CodingKeys.self)
+                    switch self {
+                    case .server:
+                        try container.encode("server", forKey: .server)
+                    case .user(let userId):
+                        try container.encode(userId, forKey: .user)
+                    }
+                }
+            }
+        }
+
+        let signingPrivateKey = try ECPrivateKey.make(for: .secp521r1)
+        let signingPrivateKeyBytes = signingPrivateKey.pemString.bytes
+
+        let signingPublicKey = try signingPrivateKey.extractPublicKey()
+        let signingPublicKeyBytes = signingPublicKey.pemString.bytes
+
+        let privateKeyData = Data(signingPrivateKeyBytes)
+        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData, signatureType: .asn1)
+
+        let serverClaims = DeprecatedMembershipClaims(jti: JWTId(), iss: DeprecatedMembershipClaims.DeprecatedIssuer.server, sub: userId, iat: Date().addingTimeInterval(-10), exp: Date().addingTimeInterval(10), groupId: groupId, admin: true)
+        var serverJwt = JWT(claims: serverClaims)
+        let serverCertificate = try serverJwt.sign(using: jwtSigner)
+
+        try cryptoManager.validateServerSignedMembershipCertificate(certificate: serverCertificate, membership: membership, publicKey: Data(signingPublicKeyBytes))
+
+        let userClaims = DeprecatedMembershipClaims(jti: JWTId(), iss: DeprecatedMembershipClaims.DeprecatedIssuer.user(userId), sub: userId, iat: Date().addingTimeInterval(-10), exp: Date().addingTimeInterval(10), groupId: groupId, admin: true)
+        var userJwt = JWT(claims: userClaims)
+        let userCertificate = try userJwt.sign(using: jwtSigner)
+
+        let user = User(userId: userId, publicSigningKey: Data(signingPublicKeyBytes), publicName: nil)
+        try cryptoManager.validateUserSignedMembershipCertificate(certificate: userCertificate, membership: membership, issuer: user)
+    }
+
     func testInitializeConversation() throws {
         let publicKeyMaterial = try cryptoManager.generateHandshakeKeyMaterial(signer: user)
 

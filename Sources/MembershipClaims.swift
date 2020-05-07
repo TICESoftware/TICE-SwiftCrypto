@@ -36,27 +36,35 @@ public struct MembershipClaims: Claims {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            if let userId = try container.decodeIfPresent(UUID.self, forKey: .user) {
-                self = .user(userId)
-            } else {
-                let server = try container.decode(String.self, forKey: .server)
-                guard server == "server" else {
-                    throw CertificateValidationError.invalidClaims
-                }
+            do {
+                let rawString = try decoder.singleValueContainer().decode(String.self)
 
-                self = .server
+                if rawString == "server" {
+                    self = .server
+                } else {
+                    guard let userId = UserId(uuidString: rawString) else {
+                        throw CertificateValidationError.invalidClaims
+                    }
+                    self = .user(userId)
+                }
+            } catch is DecodingError {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                if let userId = try container.decodeIfPresent(UUID.self, forKey: .user) {
+                    self = .user(userId)
+                } else {
+                    let server = try container.decode(String.self, forKey: .server)
+                    guard server == "server" else {
+                        throw CertificateValidationError.invalidClaims
+                    }
+
+                    self = .server
+                }
             }
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            switch self {
-            case .server:
-                try container.encode("server", forKey: .server)
-            case .user(let userId):
-                try container.encode(userId, forKey: .user)
-            }
+            var container = encoder.singleValueContainer()
+            try container.encode(description)
         }
     }
 }
