@@ -10,10 +10,11 @@ import X3DH
 import DoubleRatchet
 import Sodium
 import HKDF
+import Logging
 
 public typealias ConversationFingerprint = String
 
-public enum CryptoManagerError: LocalizedError {
+public enum CryptoManagerError: Error, CustomStringConvertible {
     case initializationFailed(Error)
     case invalidMessageSignature
     case couldNotAccessSignedInUser
@@ -29,20 +30,20 @@ public enum CryptoManagerError: LocalizedError {
     case oneTimePrekeyMissing
     case cryptoStoreNotFound
 
-    public var errorDescription: String? {
+    public var description: String {
         switch self {
-        case .initializationFailed(let error): return "Initialization failed. Reason: \(error)"
+        case .initializationFailed(let error): return "Initialization failed. Reason: \(String(describing: error))"
         case .invalidMessageSignature: return "Invalid message signature"
         case .couldNotAccessSignedInUser: return "could not access signed in user"
         case .encryptionError: return "Encryption failed"
-        case .decryptionError(let error): return "Decryption failed. Reason: \(error?.localizedDescription ?? "None")"
+        case .decryptionError(let error): return "Decryption failed. Reason: \(error.map { String(describing: $0) } ?? "None")"
         case .hashingError: return "Hashing failed"
         case .conversationNotInitialized: return "Conversation with user not initialized yet."
         case .maxSkipExceeded: return "Skipped too many messages. Ratchet step required."
         case .tokenGenerationFailed: return "Could not generate token."
         case .invalidKey: return "Invalid key"
-        case .serializationError(let error): return error.localizedDescription
-        case .certificateValidationFailed(let error): return "Certificate validation failed. Reason: \(error.localizedDescription)"
+        case .serializationError(let error): return String(describing: error)
+        case .certificateValidationFailed(let error): return "Certificate validation failed. Reason: \(String(describing: error))"
         case .oneTimePrekeyMissing: return "No one-time prekey present."
         case .cryptoStoreNotFound: return "No crypto store found."
         }
@@ -88,6 +89,8 @@ public class CryptoManager {
     public let certificatesValidFor: TimeInterval = 60*60*24*30*6
     public let certificatesMaxValidInHistory: TimeInterval = 60*60*24*30*6
     public let jwtValidationLeeway: TimeInterval = 3
+    
+    let logger: Logger
 
     var handshake: X3DH
     @SynchronizedProperty var doubleRatchets: [Conversation: DoubleRatchet]
@@ -96,12 +99,13 @@ public class CryptoManager {
     let encoder: JSONEncoder
     let decoder: JSONDecoder
 
-    public init(cryptoStore: CryptoStore?, encoder: JSONEncoder, decoder: JSONDecoder) {
+    public init(cryptoStore: CryptoStore?, encoder: JSONEncoder, decoder: JSONDecoder, logger: Logger) {
         self.cryptoStore = cryptoStore
         self.encoder = encoder
         self.decoder = decoder
         self.handshake = X3DH()
         self.doubleRatchets = [:]
+        self.logger = logger
     }
 
     // MARK: Persistence
@@ -129,6 +133,9 @@ public class CryptoManager {
 
             let conversation = Conversation(userId: conversationState.userId, conversationId: conversationState.conversationId)
             let doubleRatchet = DoubleRatchet(sessionState: sessionState)
+
+            doubleRatchet.setLogger(logger)
+            
             doubleRatchets[conversation] = doubleRatchet
         }
         self.doubleRatchets = doubleRatchets
@@ -245,6 +252,7 @@ public class CryptoManager {
         let prekeyPair: TICEModels.KeyPair
         let prekeySignature: Signature
         if renewSignedPrekey {
+            logger.debug("Renewing signed prekey.")
             let signedPrekeyPair = try handshake.generateSignedPrekeyPair(signer: { try sign(prekey: Data($0), with: signer) })
             try cryptoStore.savePrekeyPair(signedPrekeyPair.keyPair.dataKeyPair, signature: signedPrekeyPair.signature)
 
@@ -285,6 +293,7 @@ public class CryptoManager {
         let keyAgreementInitiation = try handshake.initiateKeyAgreement(remoteIdentityKey: remoteIdentityKey.keyExchangeKey, remotePrekey: remoteSignedPrekey.keyExchangeKey, prekeySignature: remotePrekeySignature, remoteOneTimePrekey: remoteOneTimePrekey?.keyExchangeKey, identityKeyPair: identityKeyPair, prekey: prekey.keyExchangeKey, prekeySignatureVerifier: verifier, info: info)
 
         let doubleRatchet = try DoubleRatchet(keyPair: nil, remotePublicKey: remoteSignedPrekey.keyExchangeKey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
+        doubleRatchet.setLogger(logger)
         let conversation = Conversation(userId: userId, conversationId: conversationId)
         doubleRatchets[conversation] = doubleRatchet
         try saveConversationState(for: conversation)
@@ -309,6 +318,7 @@ public class CryptoManager {
         let sharedSecret = try handshake.sharedSecretFromKeyAgreement(remoteIdentityKey: conversationInvitation.identityKey.keyExchangeKey, remoteEphemeralKey: conversationInvitation.ephemeralKey.keyExchangeKey, usedOneTimePrekeyPair: oneTimePrekeyPair.keyExchangeKeyPair, identityKeyPair: identityKeyPair, prekeyPair: prekeyPair, info: info)
 
         let doubleRatchet = try DoubleRatchet(keyPair: prekeyPair, remotePublicKey: nil, sharedSecret: sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
+        doubleRatchet.setLogger(logger)
         let conversation = Conversation(userId: userId, conversationId: conversationId)
         doubleRatchets[conversation] = doubleRatchet
         try saveConversationState(for: conversation)

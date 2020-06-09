@@ -18,12 +18,13 @@ let package = Package(
         .package(url: "https://github.com/TICESoftware/Swift-JWT.git", from: "3.6.0"),
         .package(url: "https://github.com/IBM-Swift/BlueECC.git", from: "1.2.1"),
         .package(url: "https://github.com/TICESoftware/X3DH.git", from: "2.0.0"),
-        .package(url: "https://github.com/TICESoftware/DoubleRatchet.git", from: "1.0.0")
+        .package(url: "https://github.com/TICESoftware/DoubleRatchet.git", from: "1.2.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.0.0"),
     ],
     targets: [
         .target(
             name: "TICECrypto",
-            dependencies: ["TICEModels", "SwiftJWT", "CryptorECC", "X3DH", "DoubleRatchet"],
+            dependencies: ["TICEModels", "SwiftJWT", "CryptorECC", "X3DH", "DoubleRatchet", "Logging"],
             path: "Sources"),
         .testTarget(
             name: "TICECryptoTests",

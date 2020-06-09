@@ -3,12 +3,15 @@ import SwiftJWT
 import CryptorECC
 import DoubleRatchet
 import X3DH
+import Logging
 @testable import TICEModels
 @testable import TICECrypto
 
 final class CryptoTests: XCTestCase {
 
-    let cryptoManager = CryptoManager(cryptoStore: TestCryptoStore(), encoder: JSONEncoder(), decoder: JSONDecoder())
+    lazy var logger: Logger = { Logger(label: "software.tice.TICECrypto.tests", factory: TestLogHandler.init) }()
+    
+    lazy var cryptoManager = { CryptoManager(cryptoStore: TestCryptoStore(), encoder: JSONEncoder(), decoder: JSONDecoder(), logger: logger) }()
     let groupId = UUID(uuidString: "E621E1F8-C36C-495A-93FC-0C247A3E6E5F")!
     let userId = UUID(uuidString: "F621E1F8-C36C-495A-93FC-0C247A3E6E5F")!
 
@@ -204,7 +207,7 @@ final class CryptoTests: XCTestCase {
         // Publish public key material...
 
         let bob = TestUser(userId: UserId())
-        let bobsCryptoManager = CryptoManager(cryptoStore: TestCryptoStore(), encoder: JSONEncoder(), decoder: JSONDecoder())
+        let bobsCryptoManager = CryptoManager(cryptoStore: TestCryptoStore(), encoder: JSONEncoder(), decoder: JSONDecoder(), logger: logger)
         _ = try bobsCryptoManager.generateHandshakeKeyMaterial(signer: bob)
 
         // Bob gets prekey bundle and remote verification key from server
@@ -226,7 +229,7 @@ final class CryptoTests: XCTestCase {
 
     func testMaxSkipExceeded() throws {
         let bob = TestUser(userId: UserId())
-        let bobsCryptoManager = CryptoManager(cryptoStore: TestCryptoStore(), encoder: JSONEncoder(), decoder: JSONDecoder())
+        let bobsCryptoManager = CryptoManager(cryptoStore: TestCryptoStore(), encoder: JSONEncoder(), decoder: JSONDecoder(), logger: logger)
         _ = try bobsCryptoManager.generateHandshakeKeyMaterial(signer: bob)
 
         let handshakeInfo = try cryptoManager.generateHandshakeKeyMaterial(signer: user)
@@ -376,5 +379,28 @@ class TestCryptoStore: CryptoStore {
 
     func loadConversationStates() throws -> [ConversationState] {
         []
+    }
+}
+
+struct TestLogHandler: LogHandler {
+    var metadata: Logger.Metadata = [:]
+    var logLevel: Logger.Level = .trace
+    let identifier: String
+    
+    init(identifier: String) {
+        self.identifier = identifier
+    }
+    
+    subscript(metadataKey metadataKey: String) -> Logger.Metadata.Value? {
+        get {
+            metadata[metadataKey]
+        }
+        set(newValue) {
+            metadata[metadataKey] = newValue
+        }
+    }
+    
+    func log(level: Logger.Level, message: Logger.Message, metadata: Logger.Metadata?, file: String, function: String, line: UInt) {
+        print("TEST log: \(level) \(message) \(file) \(function) \(line)")
     }
 }
