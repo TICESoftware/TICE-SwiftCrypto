@@ -86,9 +86,8 @@ public class CryptoManager {
     let maxSkip = 100
     let maxCache = 100
     let oneTimePrekeyCount = 100
-    public let certificatesValidFor: TimeInterval = 60*60*24*30*6
-    public let certificatesMaxValidInHistory: TimeInterval = 60*60*24*30*6
-    public let jwtValidationLeeway: TimeInterval = 3
+    public let certificatesValidFor: TimeInterval = 60*60*24*30*12
+    public let jwtValidationLeeway: TimeInterval = 5
     
     let logger: Logger
 
