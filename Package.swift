@@ -15,8 +15,8 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/TICESoftware/TICE-SwiftModels.git", Version(19,0,0)..<Version(47,0,0)),
-        .package(url: "https://github.com/TICESoftware/Swift-JWT.git", from: "3.6.0"),
-        .package(url: "https://github.com/IBM-Swift/BlueECC.git", from: "1.2.1"),
+        .package(url: "https://github.com/TICESoftware/Swift-JWT.git", from: "3.6.2"),
+        .package(url: "https://github.com/TICESoftware/BlueECC.git", from: "1.2.6"),
         .package(url: "https://github.com/TICESoftware/X3DH.git", from: "2.0.0"),
         .package(url: "https://github.com/TICESoftware/DoubleRatchet.git", from: "1.0.0")
     ],
