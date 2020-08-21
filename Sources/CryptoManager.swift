@@ -430,10 +430,10 @@ public class CryptoManager {
         return try jwt.sign(using: jwtSigner)
     }
 
-    public func parseAuthHeaderClaims(_ authHeader: Certificate) throws -> UserId {
+    public func parseAuthHeaderClaims(_ authHeader: Certificate, leeway: TimeInterval? = nil) throws -> UserId {
         let jwt = try JWT<AuthHeaderClaims>(jwtString: authHeader)
 
-        let validateClaimsResult = jwt.validateClaims(leeway: jwtValidationLeeway)
+        let validateClaimsResult = jwt.validateClaims(leeway: leeway ?? jwtValidationLeeway)
         guard validateClaimsResult == .success else {
             throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.expired(validateClaimsResult))
         }
