@@ -239,7 +239,7 @@ final class CryptoTests: XCTestCase {
         try cryptoManager.processConversationInvitation(invitation, from: bob.userId, conversationId: conversationId)
 
         // Produce maxSkip messages that will get lost
-        for _ in 0...100 {
+        for _ in 0...5000 {
             _ = try bobsCryptoManager.encrypt(Data(), for: userId, conversationId: conversationId)
         }
 

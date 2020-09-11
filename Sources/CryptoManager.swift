@@ -80,10 +80,10 @@ public struct Conversation: Hashable, Codable {
 
 public class CryptoManager {
 
+    public static let maxSkip = 5000
+    
     let sodium = Sodium()
-
     let info = "TICE"
-    let maxSkip = 100
     let maxCache = 100
     let oneTimePrekeyCount = 100
     public let certificatesValidFor: TimeInterval = 60*60*24*30*12
@@ -128,7 +128,7 @@ public class CryptoManager {
         for conversationState in try cryptoStore.loadConversationStates() {
             let rootChainKeyPair = KeyExchange.KeyPair(publicKey: Bytes(conversationState.rootChainKeyPair.publicKey), secretKey: Bytes(conversationState.rootChainKeyPair.privateKey))
             let messageKeyCacheState = try decoder.decode(MessageKeyCacheState.self, from: conversationState.messageKeyCache)
-            let sessionState = SessionState(rootKey: Bytes(conversationState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: conversationState.rootChainRemotePublicKey.map { Bytes($0) }, sendingChainKey: conversationState.sendingChainKey.map { Bytes($0) }, receivingChainKey: conversationState.receivingChainKey.map { Bytes($0) }, sendMessageNumber: conversationState.sendMessageNumber, receivedMessageNumber: conversationState.receivedMessageNumber, previousSendingChainLength: conversationState.previousSendingChainLength, messageKeyCacheState: messageKeyCacheState, info: info, maxSkip: maxSkip, maxCache: maxCache)
+            let sessionState = SessionState(rootKey: Bytes(conversationState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: conversationState.rootChainRemotePublicKey.map { Bytes($0) }, sendingChainKey: conversationState.sendingChainKey.map { Bytes($0) }, receivingChainKey: conversationState.receivingChainKey.map { Bytes($0) }, sendMessageNumber: conversationState.sendMessageNumber, receivedMessageNumber: conversationState.receivedMessageNumber, previousSendingChainLength: conversationState.previousSendingChainLength, messageKeyCacheState: messageKeyCacheState, info: info, maxSkip: Self.maxSkip, maxCache: maxCache)
 
             let conversation = Conversation(userId: conversationState.userId, conversationId: conversationState.conversationId)
             let doubleRatchet = DoubleRatchet(sessionState: sessionState)
@@ -291,7 +291,7 @@ public class CryptoManager {
 
         let keyAgreementInitiation = try handshake.initiateKeyAgreement(remoteIdentityKey: remoteIdentityKey.keyExchangeKey, remotePrekey: remoteSignedPrekey.keyExchangeKey, prekeySignature: remotePrekeySignature, remoteOneTimePrekey: remoteOneTimePrekey?.keyExchangeKey, identityKeyPair: identityKeyPair, prekey: prekey.keyExchangeKey, prekeySignatureVerifier: verifier, info: info)
 
-        let doubleRatchet = try DoubleRatchet(keyPair: nil, remotePublicKey: remoteSignedPrekey.keyExchangeKey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
+        let doubleRatchet = try DoubleRatchet(keyPair: nil, remotePublicKey: remoteSignedPrekey.keyExchangeKey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: Self.maxSkip, maxCache: maxCache, info: info)
         doubleRatchet.setLogger(logger)
         let conversation = Conversation(userId: userId, conversationId: conversationId)
         doubleRatchets[conversation] = doubleRatchet
@@ -316,7 +316,7 @@ public class CryptoManager {
 
         let sharedSecret = try handshake.sharedSecretFromKeyAgreement(remoteIdentityKey: conversationInvitation.identityKey.keyExchangeKey, remoteEphemeralKey: conversationInvitation.ephemeralKey.keyExchangeKey, usedOneTimePrekeyPair: oneTimePrekeyPair.keyExchangeKeyPair, identityKeyPair: identityKeyPair, prekeyPair: prekeyPair, info: info)
 
-        let doubleRatchet = try DoubleRatchet(keyPair: prekeyPair, remotePublicKey: nil, sharedSecret: sharedSecret, maxSkip: maxSkip, maxCache: maxCache, info: info)
+        let doubleRatchet = try DoubleRatchet(keyPair: prekeyPair, remotePublicKey: nil, sharedSecret: sharedSecret, maxSkip: Self.maxSkip, maxCache: maxCache, info: info)
         doubleRatchet.setLogger(logger)
         let conversation = Conversation(userId: userId, conversationId: conversationId)
         doubleRatchets[conversation] = doubleRatchet
