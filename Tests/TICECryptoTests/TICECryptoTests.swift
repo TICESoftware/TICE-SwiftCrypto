@@ -200,6 +200,17 @@ final class CryptoTests: XCTestCase {
         let user = User(userId: userId, publicSigningKey: Data(signingPublicKeyBytes), publicName: nil)
         try cryptoManager.validateUserSignedMembershipCertificate(certificate: userCertificate, membership: membership, issuer: user)
     }
+    
+    func testRemainingValidityTime() throws {
+        let signingPrivateKey = try ECPrivateKey.make(for: .secp521r1)
+        let signingPrivateKeyBytes = signingPrivateKey.pemString.bytes
+
+        let certificate = try cryptoManager.createServerSignedMembershipCertificate(userId: userId, groupId: groupId, admin: true, signingKey: Data(signingPrivateKeyBytes))
+        
+        let remainingValidityTime = try cryptoManager.remainingValidityTime(certificate: certificate)
+        
+        XCTAssertEqual(remainingValidityTime, 60*60*24*30*12, accuracy: 5.0)
+    }
 
     func testInitializeConversation() throws {
         let publicKeyMaterial = try cryptoManager.generateHandshakeKeyMaterial(signer: user)

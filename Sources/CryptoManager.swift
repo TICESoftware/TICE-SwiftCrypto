@@ -221,6 +221,16 @@ public class CryptoManager {
             throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.expired(validateClaimsResult))
         }
     }
+    
+    public func remainingValidityTime(certificate: Certificate) throws -> TimeInterval {
+        let jwt = try JWT<MembershipClaims>(jwtString: certificate)
+        
+        guard let exp = jwt.claims.exp else {
+            return 0
+        }
+        
+        return exp.timeIntervalSince(Date())
+    }
 
     public func tokenKeyForGroupWith(groupKey: SecretKey, user: UserProtocol) throws -> SecretKey {
         var inputKeyingMaterial = Bytes()
