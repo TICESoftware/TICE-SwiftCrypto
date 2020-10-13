@@ -20,6 +20,7 @@ public enum CryptoManagerError: Error, CustomStringConvertible {
     case couldNotAccessSignedInUser
     case encryptionError
     case decryptionError(Error?)
+    case discardedObsoleteMessage
     case hashingError
     case conversationNotInitialized
     case maxSkipExceeded
@@ -37,6 +38,7 @@ public enum CryptoManagerError: Error, CustomStringConvertible {
         case .couldNotAccessSignedInUser: return "could not access signed in user"
         case .encryptionError: return "Encryption failed"
         case .decryptionError(let error): return "Decryption failed. Reason: \(error.map { String(describing: $0) } ?? "None")"
+        case .discardedObsoleteMessage: return "Discarded obsolete message."
         case .hashingError: return "Hashing failed"
         case .conversationNotInitialized: return "Conversation with user not initialized yet."
         case .maxSkipExceeded: return "Skipped too many messages. Ratchet step required."
@@ -396,6 +398,8 @@ public class CryptoManager {
             plaintext = try doubleRatchet.decrypt(message: encryptedMessage)
         } catch DRError.exceedMaxSkip {
             throw CryptoManagerError.maxSkipExceeded
+        } catch DRError.discardOldMessage {
+            throw CryptoManagerError.discardedObsoleteMessage
         } catch {
             throw CryptoManagerError.decryptionError(error)
         }
