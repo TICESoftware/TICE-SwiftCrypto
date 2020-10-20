@@ -86,7 +86,7 @@ public class CryptoManager {
     
     let sodium = Sodium()
     let info = "TICE"
-    let maxCache = 100
+    let maxCache = 5010
     let oneTimePrekeyCount = 100
     public let certificatesValidFor: TimeInterval = 60*60*24*30*12
     public let jwtValidationLeeway: TimeInterval = 5
