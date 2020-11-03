@@ -5,6 +5,7 @@
 import Foundation
 import TICEModels
 import SwiftJWT
+import JWTKit
 import CryptorECC
 import X3DH
 import DoubleRatchet
@@ -83,13 +84,13 @@ public struct Conversation: Hashable, Codable {
 public class CryptoManager {
 
     public static let maxSkip = 5000
+    public static let jwtValidationLeeway: TimeInterval = 5
     
     let sodium = Sodium()
     let info = "TICE"
     let maxCache = 5010
     let oneTimePrekeyCount = 100
     public let certificatesValidFor: TimeInterval = 60*60*24*30*12
-    public let jwtValidationLeeway: TimeInterval = 5
     
     let logger: Logger
 
@@ -218,7 +219,7 @@ public class CryptoManager {
             throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.invalidSignature)
         }
 
-        let validateClaimsResult = jwt.validateClaims(leeway: jwtValidationLeeway)
+        let validateClaimsResult = jwt.validateClaims(leeway: Self.jwtValidationLeeway)
         guard validateClaimsResult == .success else {
             throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.expired(validateClaimsResult))
         }
@@ -436,27 +437,31 @@ public class CryptoManager {
 
     public func generateAuthHeader(signingKey: PrivateKey, userId: UserId) throws -> Certificate {
         let issueDate = Date()
-        guard let randomBytes = sodium.randomBytes.buf(length: 16) else { throw CryptoManagerError.tokenGenerationFailed }
-        let claims = AuthHeaderClaims(iss: userId, iat: issueDate, exp: issueDate.addingTimeInterval(120), nonce: Data(randomBytes))
-        var jwt = JWT(claims: claims)
-
-        let jwtSigner = JWTSigner.es512(privateKey: signingKey, signatureType: .asn1)
-        return try jwt.sign(using: jwtSigner)
+        guard let randomBytes = sodium.randomBytes.buf(length: 16) else {
+            throw CryptoManagerError.tokenGenerationFailed
+        }
+        
+        let claims = AuthHeaderClaims(iss: userId, iat: .init(value: issueDate), exp: .init(value: issueDate.addingTimeInterval(120)), nonce: Data(randomBytes))
+        let jwtSigner = JWTSigner.es512(key: try ECDSAKey.private(pem: signingKey))
+        let jwt = try jwtSigner.sign(claims)
+        return try jwtRSTojwtAsn1(jwt)
     }
 
     public func parseAuthHeaderClaims(_ authHeader: Certificate, leeway: TimeInterval? = nil) throws -> UserId {
-        let jwt = try JWT<AuthHeaderClaims>(jwtString: authHeader)
-
-        let validateClaimsResult = jwt.validateClaims(leeway: leeway ?? jwtValidationLeeway)
-        guard validateClaimsResult == .success else {
-            throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.expired(validateClaimsResult))
-        }
-        return jwt.claims.iss
+        let claims = try jwtPayload(authHeader, as: AuthHeaderClaims.self)
+        try claims.verify()
+        return claims.iss
     }
 
     public func verify(authHeader: Certificate, publicKey: TICEModels.PublicKey) -> Bool {
-        let jwtVerifier = JWTVerifier.es512(publicKey: publicKey, signatureType: signatureType(of: authHeader))
-        return JWT<AuthHeaderClaims>.verify(authHeader, using: jwtVerifier)
+        do {
+            let signer = try JWTSigner.es512(key: .public(pem: publicKey))
+            let authHeaderRS = try jwtAsn1TojwtRS(authHeader)
+            _ = try signer.verify(authHeaderRS, as: AuthHeaderClaims.self)
+            return true
+        } catch {
+            return false
+        }
     }
 }
 
