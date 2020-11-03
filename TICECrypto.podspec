@@ -1,10 +1,10 @@
 Pod::Spec.new do |s|
 
   s.name          = "TICECrypto"
-  s.version       = "29.2.1"
+  s.version       = "29.2.2"
   s.summary       = "Crypto to be used in TICE projects."
-  s.platform      = :ios, "11.0"
-  s.swift_version = "5.1"
+  s.platform      = :ios, "12.0"
+  s.swift_version = "5.0"
 
   s.homepage      = "https://ticeapp.com"
 
