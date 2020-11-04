@@ -29,21 +29,12 @@
         }
       },
       {
-        "package": "Clibsodium",
-        "repositoryURL": "https://github.com/tiwoc/Clibsodium.git",
-        "state": {
-          "branch": null,
-          "revision": "2ac72772aae26b2da0b15c253d9bb79ba452f66a",
-          "version": "1.0.0"
-        }
-      },
-      {
         "package": "DoubleRatchet",
         "repositoryURL": "https://github.com/TICESoftware/DoubleRatchet.git",
         "state": {
           "branch": null,
-          "revision": "e07b305b6b4a753d200046b99f46ff6e977830c8",
-          "version": "1.2.1"
+          "revision": "63b308bdebc51c26618da6100713caadd5ea8a80",
+          "version": "1.2.4"
         }
       },
       {
@@ -51,8 +42,8 @@
         "repositoryURL": "https://github.com/TICESoftware/HKDF.git",
         "state": {
           "branch": null,
-          "revision": "5bc6681e7d641826fc410b20bd03cb22ff376dd5",
-          "version": "1.0.5"
+          "revision": "9cd780c25d41355113662144dc135dde216428cd",
+          "version": "1.0.8"
         }
       },
       {
@@ -96,8 +87,8 @@
         "repositoryURL": "https://github.com/jedisct1/swift-sodium",
         "state": {
           "branch": null,
-          "revision": "5900a54dea817befa18f3148889fe922a38afe7f",
-          "version": "0.8.0"
+          "revision": "176745ddc4991b27f80c3c2637652eb33b5782eb",
+          "version": "0.9.0"
         }
       },
       {
@@ -114,8 +105,8 @@
         "repositoryURL": "https://github.com/TICESoftware/X3DH.git",
         "state": {
           "branch": null,
-          "revision": "6ba2729191fa28a70bd4e03666dc1aab4d12ec80",
-          "version": "2.0.4"
+          "revision": "dc915c925849533637c8ca79b711db39f4e3ec25",
+          "version": "2.0.7"
         }
       }
     ]
