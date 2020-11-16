@@ -199,9 +199,9 @@ public class CryptoManager {
     }
 
     private func validate(certificate: Certificate, membership: Membership, issuer: MembershipClaims.Issuer, publicKey: TICEModels.PublicKey) throws {
-        
         let signer = try JWTSigner.es512(key: .public(pem: publicKey))
-        let jwt = try jwtAsn1TojwtRS(certificate)
+        let jwt = signatureType(of: certificate) == .rs ? certificate : try jwtAsn1TojwtRS(certificate)
+        
         do {
             let claims = try signer.verify(jwt, as: MembershipClaims.self)
             guard claims.groupId == membership.groupId,
@@ -470,7 +470,7 @@ public class CryptoManager {
     public func verify(authHeader: Certificate, publicKey: TICEModels.PublicKey) -> Bool {
         do {
             let signer = try JWTSigner.es512(key: .public(pem: publicKey))
-            let authHeaderRS = try jwtAsn1TojwtRS(authHeader)
+            let authHeaderRS = signatureType(of: authHeader) == .rs ? authHeader : try jwtAsn1TojwtRS(authHeader)
             _ = try signer.verify(authHeaderRS, as: AuthHeaderClaims.self)
             return true
         } catch {

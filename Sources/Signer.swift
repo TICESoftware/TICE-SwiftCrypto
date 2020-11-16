@@ -2,7 +2,6 @@
 //  Copyright © 2018 Anbion. All rights reserved.
 //
 
-import CryptorECC
 import TICEModels
 
 public protocol Signer {
