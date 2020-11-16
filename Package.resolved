@@ -3,11 +3,11 @@
     "pins": [
       {
         "package": "Cryptor",
-        "repositoryURL": "https://github.com/IBM-Swift/BlueCryptor.git",
+        "repositoryURL": "https://github.com/Kitura/BlueCryptor.git",
         "state": {
           "branch": null,
-          "revision": "12d2bf3ec7207ec3cd004b9582f69ef5fae1da3b",
-          "version": "1.0.32"
+          "revision": "ee5880e031da4c609f372cf7472476ab51d5dd19",
+          "version": "1.0.200"
         }
       },
       {
@@ -21,11 +21,11 @@
       },
       {
         "package": "CryptorRSA",
-        "repositoryURL": "https://github.com/IBM-Swift/BlueRSA.git",
+        "repositoryURL": "https://github.com/Kitura/BlueRSA.git",
         "state": {
           "branch": null,
-          "revision": "8ea901f2582296837d88f882b0fa5a0601759598",
-          "version": "1.0.35"
+          "revision": "c885fcdbe1b04718cb46d747387137653c030f6c",
+          "version": "1.0.200"
         }
       },
       {
@@ -57,20 +57,20 @@
       },
       {
         "package": "KituraContracts",
-        "repositoryURL": "https://github.com/IBM-Swift/KituraContracts.git",
+        "repositoryURL": "https://github.com/Kitura/KituraContracts.git",
         "state": {
           "branch": null,
-          "revision": "a30e2fb79e926672776a05ec6b919c239870a221",
-          "version": "1.2.1"
+          "revision": "8418006e39e2efae9b31ae92721cb597ac29c617",
+          "version": "1.2.200"
         }
       },
       {
         "package": "LoggerAPI",
-        "repositoryURL": "https://github.com/IBM-Swift/LoggerAPI.git",
+        "repositoryURL": "https://github.com/Kitura/LoggerAPI.git",
         "state": {
           "branch": null,
-          "revision": "3357dd9526cdf9436fa63bb792b669e6efdc43da",
-          "version": "1.9.0"
+          "revision": "e82d34eab3f0b05391082b11ea07d3b70d2f65bb",
+          "version": "1.9.200"
         }
       },
       {
@@ -87,8 +87,8 @@
         "repositoryURL": "https://github.com/TICESoftware/Swift-JWT.git",
         "state": {
           "branch": null,
-          "revision": "292bdcaa1a7a034227c0531f38e8e95ec0a184c2",
-          "version": "3.6.2"
+          "revision": "a22af7ada72d10aef1f27934a4ec7d78b84b214b",
+          "version": "3.6.202"
         }
       },
       {
@@ -114,8 +114,8 @@
         "repositoryURL": "https://github.com/TICESoftware/TICE-SwiftModels.git",
         "state": {
           "branch": null,
-          "revision": "7441e63b37a094f7942ce61ba64a3051d2d17d64",
-          "version": "48.0.0"
+          "revision": "d3cdb4216862b2370fae16e57e113b189a2a63dd",
+          "version": "48.1.0"
         }
       },
       {
