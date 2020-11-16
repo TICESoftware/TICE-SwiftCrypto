@@ -183,7 +183,7 @@ public class CryptoManager {
     private func createMembershipCertificate(jwtId: JWTId, userId: UserId, groupId: GroupId, admin: Bool, issuer: MembershipClaims.Issuer, signingKey: PrivateKey) throws -> Certificate {
         let issueDate = Date()
         
-        let claims = MembershipClaims(jti: jwtId, iss: issuer, sub: userId, iat: .init(value: issueDate), exp: .init(value: issueDate.addingTimeInterval(certificatesValidFor)), groupId: groupId, admin: admin)
+        let claims = MembershipClaims(jti: jwtId, iss: issuer, sub: userId, iat: issueDate, exp: issueDate.addingTimeInterval(certificatesValidFor), groupId: groupId, admin: admin)
         
         let jwtSigner = JWTSigner.es512(key: try ECDSAKey.private(pem: signingKey))
         let jwt = try jwtSigner.sign(claims)
@@ -455,7 +455,7 @@ public class CryptoManager {
             throw CryptoManagerError.tokenGenerationFailed
         }
         
-        let claims = AuthHeaderClaims(iss: userId, iat: .init(value: issueDate), exp: .init(value: issueDate.addingTimeInterval(120)), nonce: Data(randomBytes))
+        let claims = AuthHeaderClaims(iss: userId, iat: issueDate, exp: issueDate.addingTimeInterval(120), nonce: Data(randomBytes))
         let jwtSigner = JWTSigner.es512(key: try ECDSAKey.private(pem: signingKey))
         let jwt = try jwtSigner.sign(claims)
         return try jwtRSTojwtAsn1(jwt)

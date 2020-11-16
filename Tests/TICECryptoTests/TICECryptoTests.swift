@@ -79,7 +79,7 @@ final class CryptoTests: XCTestCase {
     }
 
     func testValidateExpiredCertificate() throws {
-        let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: .init(value: Date().addingTimeInterval(-20)), exp: .init(value: Date().addingTimeInterval(-10)), groupId: groupId, admin: true)
+        let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(-20), exp: Date().addingTimeInterval(-10), groupId: groupId, admin: true)
         
         let privateKeyData = Data(user.privateSigningKey)
         let jwtSigner = JWTKit.JWTSigner.es512(key: try ECDSAKey.private(pem: privateKeyData))
@@ -100,7 +100,7 @@ final class CryptoTests: XCTestCase {
     }
 
     func testValidateCertificateIssuedInFuture() throws {
-        let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: .init(value: Date().addingTimeInterval(60)), exp: .init(value: Date().addingTimeInterval(3600)), groupId: groupId, admin: true)
+        let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(60), exp: Date().addingTimeInterval(3600), groupId: groupId, admin: true)
         
         let privateKeyData = Data(user.privateSigningKey)
         let jwtSigner = JWTKit.JWTSigner.es512(key: try ECDSAKey.private(pem: privateKeyData))
@@ -121,7 +121,7 @@ final class CryptoTests: XCTestCase {
     }
 
     func testValidateCertificateInvalidSignature() throws {
-        let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: .init(value: Date().addingTimeInterval(60)), exp: .init(value: Date().addingTimeInterval(3600)), groupId: groupId, admin: true)
+        let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(60), exp: Date().addingTimeInterval(3600), groupId: groupId, admin: true)
         
         guard let privateKeyData = try ECPrivateKey.make(for: .secp521r1).pemString.data(using: .utf8) else {
             XCTFail("Could not create private key")

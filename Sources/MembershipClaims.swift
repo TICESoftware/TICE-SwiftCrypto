@@ -17,6 +17,16 @@ public struct MembershipClaims: JWTPayload {
     public let groupId: GroupId
     public let admin: Bool
     
+    public init(jti: JWTId, iss: Issuer, sub: UserId, iat: Date?, exp: Date?, groupId: GroupId, admin: Bool) {
+        self.jti = jti
+        self.iss = iss
+        self.sub = sub
+        self.iat = iat.map { IssuedAtClaim(value: $0) }
+        self.exp = exp.map { ExpirationClaim(value: $0) }
+        self.groupId = groupId
+        self.admin = admin
+    }
+    
     public func verify(using signer: JWTSigner) throws {
         try exp?.verifyNotExpired(currentDate: Date().addingTimeInterval(CryptoManager.jwtValidationLeeway))
         try iat?.verifyIssuedInPast(currentDate: Date().addingTimeInterval(CryptoManager.jwtValidationLeeway))

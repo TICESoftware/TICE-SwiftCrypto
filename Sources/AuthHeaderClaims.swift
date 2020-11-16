@@ -12,10 +12,10 @@ public struct AuthHeaderClaims: JWTPayload {
     public var exp: ExpirationClaim?
     public var nonce: Data
     
-    public init(iss: UserId, iat: IssuedAtClaim?, exp: ExpirationClaim?, nonce: Data) {
+    public init(iss: UserId, iat: Date?, exp: Date?, nonce: Data) {
         self.iss = iss
-        self.iat = iat
-        self.exp = exp
+        self.iat = iat.map { IssuedAtClaim(value: $0) }
+        self.exp = exp.map { ExpirationClaim(value: $0) }
         self.nonce = nonce
     }
     
