@@ -4,7 +4,6 @@
 
 import Foundation
 import TICEModels
-import SwiftJWT
 import JWTKit
 import CryptorECC
 import X3DH
@@ -58,7 +57,7 @@ public enum CertificateValidationError: Error, CustomStringConvertible {
     case invalidMembership
     case invalidClaims
     case revoked
-    case expired(ValidateClaimsResult)
+    case expired(String)
 
     public var description: String {
         switch self {
@@ -66,7 +65,7 @@ public enum CertificateValidationError: Error, CustomStringConvertible {
         case .invalidMembership: return "Invalid membership"
         case .invalidClaims: return "Invalid claims"
         case .revoked: return "Certificate is revoked"
-        case .expired(let validateClaimsResult): return "Certificate not valid anymore/yet. \(validateClaimsResult.description)"
+        case .expired(let reason): return "Certificate not valid anymore/yet. \(reason)"
         }
     }
 }
@@ -183,13 +182,12 @@ public class CryptoManager {
 
     private func createMembershipCertificate(jwtId: JWTId, userId: UserId, groupId: GroupId, admin: Bool, issuer: MembershipClaims.Issuer, signingKey: PrivateKey) throws -> Certificate {
         let issueDate = Date()
-
-        let claims = MembershipClaims(jti: jwtId, iss: issuer, sub: userId, iat: issueDate, exp: issueDate.addingTimeInterval(certificatesValidFor), groupId: groupId, admin: admin)
-        var jwt = JWT(claims: claims)
-
-        let jwtSigner = JWTSigner.es512(privateKey: signingKey, signatureType: .asn1)
-
-        return try jwt.sign(using: jwtSigner)
+        
+        let claims = MembershipClaims(jti: jwtId, iss: issuer, sub: userId, iat: .init(value: issueDate), exp: .init(value: issueDate.addingTimeInterval(certificatesValidFor)), groupId: groupId, admin: admin)
+        
+        let jwtSigner = JWTSigner.es512(key: try ECDSAKey.private(pem: signingKey))
+        let jwt = try jwtSigner.sign(claims)
+        return try jwtRSTojwtAsn1(jwt)
     }
 
     public func validateUserSignedMembershipCertificate(certificate: Certificate, membership: Membership, issuer: User) throws {
@@ -201,38 +199,54 @@ public class CryptoManager {
     }
 
     private func validate(certificate: Certificate, membership: Membership, issuer: MembershipClaims.Issuer, publicKey: TICEModels.PublicKey) throws {
-        let jwtVerifier = JWTVerifier.es512(publicKey: publicKey, signatureType: signatureType(of: certificate))
+        
+        let signer = try JWTSigner.es512(key: .public(pem: publicKey))
+        let jwt = try jwtAsn1TojwtRS(certificate)
+        do {
+            let claims = try signer.verify(jwt, as: MembershipClaims.self)
+            guard claims.groupId == membership.groupId,
+                claims.sub == membership.userId,
+                (!membership.admin || claims.admin) else {
+                throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.invalidMembership)
+            }
 
-        let jwt = try JWT<MembershipClaims>(jwtString: certificate)
-
-        guard jwt.claims.groupId == membership.groupId,
-            jwt.claims.sub == membership.userId,
-            (!membership.admin || jwt.claims.admin) else {
-            throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.invalidMembership)
+            guard claims.iss == issuer else {
+                throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.invalidClaims)
+            }
+        } catch {
+            if error is CryptoManagerError {
+                throw error
+            } else {
+                if let jwtError = error as? JWTError {
+                    var certError: CertificateValidationError
+                    switch jwtError {
+                    case let .claimVerificationFailure(name: name, reason: reason):
+                        if name == "exp" || name == "iat" {
+                            certError = .expired(reason)
+                        } else {
+                            certError = .invalidClaims
+                        }
+                    case .signatureVerifictionFailed:
+                        certError = .invalidSignature
+                    default:
+                        certError = .invalidClaims
+                    }
+                    throw CryptoManagerError.certificateValidationFailed(certError)
+                } else {
+                    throw error
+                }
+            }
         }
 
-        guard jwt.claims.iss == issuer else {
-            throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.invalidClaims)
-        }
 
-        guard JWT<MembershipClaims>.verify(certificate, using: jwtVerifier) else {
-            throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.invalidSignature)
-        }
-
-        let validateClaimsResult = jwt.validateClaims(leeway: Self.jwtValidationLeeway)
-        guard validateClaimsResult == .success else {
-            throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.expired(validateClaimsResult))
-        }
     }
     
     public func remainingValidityTime(certificate: Certificate) throws -> TimeInterval {
-        let jwt = try JWT<MembershipClaims>(jwtString: certificate)
-        
-        guard let exp = jwt.claims.exp else {
+        let claims = try jwtPayload(certificate, as: MembershipClaims.self)
+        guard let exp = claims.exp else {
             return 0
         }
-        
-        return exp.timeIntervalSince(Date())
+        return exp.value.timeIntervalSince(Date())
     }
 
     public func tokenKeyForGroupWith(groupKey: SecretKey, user: UserProtocol) throws -> SecretKey {
@@ -462,13 +476,5 @@ public class CryptoManager {
         } catch {
             return false
         }
-    }
-}
-
-public func signatureType(of jwt: Certificate) -> ECSignatureType {
-    if let signature = jwt.components(separatedBy: ".").last, signature.count > 178 {
-        return .asn1
-    } else {
-        return .rs
     }
 }

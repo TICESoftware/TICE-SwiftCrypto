@@ -1,5 +1,4 @@
 // swift-tools-version:5.1
-// The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
@@ -34,8 +33,7 @@ let package = Package(
                 
                 .product(name: "JWTKit", package: "jwt-kit"),
                 .product(name: "Logging", package: "swift-log"),
-                
-                .product(name: "SwiftJWT", package: "SwiftJWT"),
+
                 .product(name: "CryptorECC", package: "CryptorECC"),
             ],
             path: "Sources"),

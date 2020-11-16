@@ -1,5 +1,6 @@
 import XCTest
 import SwiftJWT
+import JWTKit
 import CryptorECC
 import DoubleRatchet
 import X3DH
@@ -78,12 +79,12 @@ final class CryptoTests: XCTestCase {
     }
 
     func testValidateExpiredCertificate() throws {
-        let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(-20), exp: Date().addingTimeInterval(-10), groupId: groupId, admin: true)
-        var jwt = JWT(claims: claims)
-
+        let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: .init(value: Date().addingTimeInterval(-20)), exp: .init(value: Date().addingTimeInterval(-10)), groupId: groupId, admin: true)
+        
         let privateKeyData = Data(user.privateSigningKey)
-        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData, signatureType: .asn1)
-        let certificate = try jwt.sign(using: jwtSigner)
+        let jwtSigner = JWTKit.JWTSigner.es512(key: try ECDSAKey.private(pem: privateKeyData))
+        let jwt = try jwtSigner.sign(claims)
+        let certificate = try jwtRSTojwtAsn1(jwt)
 
         do {
             try cryptoManager.validateUserSignedMembershipCertificate(certificate: certificate, membership: membership, issuer: user)
@@ -91,7 +92,7 @@ final class CryptoTests: XCTestCase {
         } catch {
             guard case CryptoManagerError.certificateValidationFailed(let certificateValidationError) = error,
                 case CertificateValidationError.expired(let validateClaimsResult) = certificateValidationError,
-                validateClaimsResult == .expired else {
+                validateClaimsResult == "expired" else {
                     XCTFail("Invalid error type (expected invalid claims): \(error.localizedDescription)")
                     return
             }
@@ -99,12 +100,12 @@ final class CryptoTests: XCTestCase {
     }
 
     func testValidateCertificateIssuedInFuture() throws {
-        let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(60), exp: Date().addingTimeInterval(3600), groupId: groupId, admin: true)
-        var jwt = JWT(claims: claims)
-
+        let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: .init(value: Date().addingTimeInterval(60)), exp: .init(value: Date().addingTimeInterval(3600)), groupId: groupId, admin: true)
+        
         let privateKeyData = Data(user.privateSigningKey)
-        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData, signatureType: .asn1)
-        let certificate = try jwt.sign(using: jwtSigner)
+        let jwtSigner = JWTKit.JWTSigner.es512(key: try ECDSAKey.private(pem: privateKeyData))
+        let jwt = try jwtSigner.sign(claims)
+        let certificate = try jwtRSTojwtAsn1(jwt)
 
         do {
             try cryptoManager.validateUserSignedMembershipCertificate(certificate: certificate, membership: membership, issuer: user)
@@ -112,7 +113,7 @@ final class CryptoTests: XCTestCase {
         } catch {
             guard case CryptoManagerError.certificateValidationFailed(let certificateValidationError) = error,
                 case CertificateValidationError.expired(let validateClaimsResult) = certificateValidationError,
-                validateClaimsResult == .issuedAt else {
+                validateClaimsResult == "issued in future" else {
                     XCTFail("Invalid error type (expected invalid claims): \(error.localizedDescription)")
                     return
             }
@@ -120,16 +121,16 @@ final class CryptoTests: XCTestCase {
     }
 
     func testValidateCertificateInvalidSignature() throws {
-        let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(60), exp: Date().addingTimeInterval(3600), groupId: groupId, admin: true)
-        var jwt = JWT(claims: claims)
-
+        let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: .init(value: Date().addingTimeInterval(60)), exp: .init(value: Date().addingTimeInterval(3600)), groupId: groupId, admin: true)
+        
         guard let privateKeyData = try ECPrivateKey.make(for: .secp521r1).pemString.data(using: .utf8) else {
             XCTFail("Could not create private key")
             return
         }
-
-        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData, signatureType: .asn1)
-        let certificate = try jwt.sign(using: jwtSigner)
+        
+        let jwtSigner = JWTKit.JWTSigner.es512(key: try ECDSAKey.private(pem: privateKeyData))
+        let jwt = try jwtSigner.sign(claims)
+        let certificate = try jwtRSTojwtAsn1(jwt)
 
         do {
             try cryptoManager.validateUserSignedMembershipCertificate(certificate: certificate, membership: membership, issuer: user)
@@ -170,7 +171,7 @@ final class CryptoTests: XCTestCase {
         
         let authHeader = try cryptoManager.generateAuthHeader(signingKey: privateKeyData, userId: UserId())
         
-        let jwtVerifier = SwiftJWT.JWTVerifier.es512(publicKey: try privateKey.extractPublicKey().pemString.data(using: .utf8)!, signatureType: signatureType(of: authHeader))
+        let jwtVerifier = SwiftJWT.JWTVerifier.es512(publicKey: try privateKey.extractPublicKey().pemString.data(using: .utf8)!, signatureType: .asn1)
         XCTAssertTrue(JWT<SwiftJWTAuthHeaderClaims>.verify(authHeader, using: jwtVerifier))
     }
     
