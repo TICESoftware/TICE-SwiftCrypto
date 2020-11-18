@@ -204,6 +204,7 @@ public class CryptoManager {
         
         do {
             let claims = try signer.verify(jwt, as: MembershipClaims.self)
+            try claims.validateClaims()
             guard claims.groupId == membership.groupId,
                 claims.sub == membership.userId,
                 (!membership.admin || claims.admin) else {
@@ -237,8 +238,6 @@ public class CryptoManager {
                 }
             }
         }
-
-
     }
     
     public func remainingValidityTime(certificate: Certificate) throws -> TimeInterval {

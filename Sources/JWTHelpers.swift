@@ -6,7 +6,7 @@ import Foundation
 import JWTKit
 import TICEModels
 
-func jwtRSTojwtAsn1(_ jwt: String) throws -> String {
+public func jwtRSTojwtAsn1(_ jwt: String) throws -> String {
     let jwtComponents = jwt.components(separatedBy: ".")
     guard jwtComponents.count == 3 else { throw CryptoManagerError.tokenGenerationFailed }
 
@@ -16,7 +16,7 @@ func jwtRSTojwtAsn1(_ jwt: String) throws -> String {
     return "\(jwtComponents[0]).\(jwtComponents[1]).\(asn1Signature)"
 }
 
-func jwtAsn1TojwtRS(_ jwt: String) throws -> String {
+public func jwtAsn1TojwtRS(_ jwt: String) throws -> String {
     let jwtComponents = jwt.components(separatedBy: ".")
     guard jwtComponents.count == 3 else { throw CryptoManagerError.tokenGenerationFailed }
     let signatureData = data(base64urlEncoded: jwtComponents[2])!
@@ -25,7 +25,7 @@ func jwtAsn1TojwtRS(_ jwt: String) throws -> String {
     return "\(jwtComponents[0]).\(jwtComponents[1]).\(rsSignature)"
 }
 
-func jwtPayload<Payload>(_ jwt: String, as payload: Payload.Type) throws -> Payload where Payload: JWTPayload {
+public func jwtPayload<Payload>(_ jwt: String, as payload: Payload.Type) throws -> Payload where Payload: JWTPayload {
     let jwtComponents = jwt.components(separatedBy: ".")
     guard jwtComponents.count == 3, let payloadData = data(base64urlEncoded: jwtComponents[1]) else {
         throw JWTError.malformedToken

@@ -27,9 +27,12 @@ public struct MembershipClaims: JWTPayload {
         self.admin = admin
     }
     
-    public func verify(using signer: JWTSigner) throws {
+    public func validateClaims() throws {
         try exp?.verifyNotExpired(currentDate: Date().addingTimeInterval(CryptoManager.jwtValidationLeeway))
         try iat?.verifyIssuedInPast(currentDate: Date().addingTimeInterval(CryptoManager.jwtValidationLeeway))
+    }
+    
+    public func verify(using signer: JWTSigner) throws {
     }
 
     public enum Issuer: Codable, Equatable, CustomStringConvertible {
