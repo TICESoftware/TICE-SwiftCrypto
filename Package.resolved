@@ -32,18 +32,18 @@
         "package": "DoubleRatchet",
         "repositoryURL": "https://github.com/TICESoftware/DoubleRatchet.git",
         "state": {
-          "branch": null,
-          "revision": "63b308bdebc51c26618da6100713caadd5ea8a80",
-          "version": "1.2.4"
+          "branch": "linux",
+          "revision": "046c355774ce3b5d8e0c688f50791d52016dddfe",
+          "version": null
         }
       },
       {
         "package": "HKDF",
         "repositoryURL": "https://github.com/TICESoftware/HKDF.git",
         "state": {
-          "branch": null,
-          "revision": "9cd780c25d41355113662144dc135dde216428cd",
-          "version": "1.0.8"
+          "branch": "linux",
+          "revision": "ed9f34b91d6837857cdf939326e7c0f2916a4be0",
+          "version": null
         }
       },
       {
@@ -102,11 +102,11 @@
       },
       {
         "package": "Sodium",
-        "repositoryURL": "https://github.com/jedisct1/swift-sodium",
+        "repositoryURL": "https://github.com/TICESoftware/swift-sodium.git",
         "state": {
-          "branch": null,
-          "revision": "176745ddc4991b27f80c3c2637652eb33b5782eb",
-          "version": "0.9.0"
+          "branch": "linux",
+          "revision": "330cff0292618ac717df361d9341d83d98172ec6",
+          "version": null
         }
       },
       {
@@ -114,17 +114,17 @@
         "repositoryURL": "https://github.com/TICESoftware/TICE-SwiftModels.git",
         "state": {
           "branch": null,
-          "revision": "d3cdb4216862b2370fae16e57e113b189a2a63dd",
-          "version": "48.1.0"
+          "revision": "5cfbabcdbb623c7cd6324b517ae774508b8b6a3b",
+          "version": "48.1.1"
         }
       },
       {
         "package": "X3DH",
         "repositoryURL": "https://github.com/TICESoftware/X3DH.git",
         "state": {
-          "branch": null,
-          "revision": "dc915c925849533637c8ca79b711db39f4e3ec25",
-          "version": "2.0.7"
+          "branch": "linux",
+          "revision": "059a426760a15d5baf8d15fae4fd5371b4aba020",
+          "version": null
         }
       }
     ]
