@@ -33,8 +33,8 @@
         "repositoryURL": "https://github.com/TICESoftware/DoubleRatchet.git",
         "state": {
           "branch": null,
-          "revision": "63b308bdebc51c26618da6100713caadd5ea8a80",
-          "version": "1.2.4"
+          "revision": "5c9fb3d28cef120358168ccdd4aefc8012d52b1a",
+          "version": "2.0.0"
         }
       },
       {
@@ -96,8 +96,8 @@
         "repositoryURL": "https://github.com/TICESoftware/TICE-SwiftModels.git",
         "state": {
           "branch": null,
-          "revision": "7441e63b37a094f7942ce61ba64a3051d2d17d64",
-          "version": "48.0.0"
+          "revision": "8205143e8b381c544ac9a1e8198d8b38dd7a0dc8",
+          "version": "49.0.0"
         }
       },
       {

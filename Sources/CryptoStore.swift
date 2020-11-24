@@ -4,6 +4,7 @@
 
 import Foundation
 import TICEModels
+import protocol DoubleRatchet.MessageKeyCache
 
 public protocol CryptoStore {
     func saveIdentityKeyPair(_ keyPair: KeyPair) throws
@@ -18,4 +19,5 @@ public protocol CryptoStore {
     func save(_ conversationState: ConversationState) throws
     func loadConversationState(userId: UserId, conversationId: ConversationId) throws -> ConversationState?
     func loadConversationStates() throws -> [ConversationState]
+    func messageKeyCache(conversationId: ConversationId) throws -> MessageKeyCache
 }

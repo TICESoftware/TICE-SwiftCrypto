@@ -116,8 +116,7 @@ public class CryptoManager {
         let sessionState = doubleRatchet.sessionState
 
         let rootChainKeyPair = TICEModels.KeyPair(privateKey: Data(sessionState.rootChainKeyPair.secretKey), publicKey: Data(sessionState.rootChainKeyPair.publicKey))
-        let messageKeyCache = try encoder.encode(sessionState.messageKeyCacheState)
-        let conversationState = ConversationState(userId: conversation.userId, conversationId: conversation.conversationId, rootKey: Data(sessionState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: sessionState.rootChainRemotePublicKey.map { Data($0) }, sendingChainKey: sessionState.sendingChainKey.map { Data($0) }, receivingChainKey: sessionState.receivingChainKey.map { Data($0) }, sendMessageNumber: sessionState.sendMessageNumber, receivedMessageNumber: sessionState.receivedMessageNumber, previousSendingChainLength: sessionState.previousSendingChainLength, messageKeyCache: messageKeyCache)
+        let conversationState = ConversationState(userId: conversation.userId, conversationId: conversation.conversationId, rootKey: Data(sessionState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: sessionState.rootChainRemotePublicKey.map { Data($0) }, sendingChainKey: sessionState.sendingChainKey.map { Data($0) }, receivingChainKey: sessionState.receivingChainKey.map { Data($0) }, sendMessageNumber: sessionState.sendMessageNumber, receivedMessageNumber: sessionState.receivedMessageNumber, previousSendingChainLength: sessionState.previousSendingChainLength)
         try cryptoStore?.save(conversationState)
     }
 
@@ -129,11 +128,11 @@ public class CryptoManager {
         var doubleRatchets: [Conversation: DoubleRatchet] = [:]
         for conversationState in try cryptoStore.loadConversationStates() {
             let rootChainKeyPair = KeyExchange.KeyPair(publicKey: Bytes(conversationState.rootChainKeyPair.publicKey), secretKey: Bytes(conversationState.rootChainKeyPair.privateKey))
-            let messageKeyCacheState = try decoder.decode(MessageKeyCacheState.self, from: conversationState.messageKeyCache)
-            let sessionState = SessionState(rootKey: Bytes(conversationState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: conversationState.rootChainRemotePublicKey.map { Bytes($0) }, sendingChainKey: conversationState.sendingChainKey.map { Bytes($0) }, receivingChainKey: conversationState.receivingChainKey.map { Bytes($0) }, sendMessageNumber: conversationState.sendMessageNumber, receivedMessageNumber: conversationState.receivedMessageNumber, previousSendingChainLength: conversationState.previousSendingChainLength, messageKeyCacheState: messageKeyCacheState, info: info, maxSkip: Self.maxSkip, maxCache: maxCache)
+            let sessionState = SessionState(rootKey: Bytes(conversationState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: conversationState.rootChainRemotePublicKey.map { Bytes($0) }, sendingChainKey: conversationState.sendingChainKey.map { Bytes($0) }, receivingChainKey: conversationState.receivingChainKey.map { Bytes($0) }, sendMessageNumber: conversationState.sendMessageNumber, receivedMessageNumber: conversationState.receivedMessageNumber, previousSendingChainLength: conversationState.previousSendingChainLength, info: info, maxSkip: Self.maxSkip)
 
             let conversation = Conversation(userId: conversationState.userId, conversationId: conversationState.conversationId)
-            let doubleRatchet = DoubleRatchet(sessionState: sessionState)
+            let messageKeyCache = try self.cryptoStore?.messageKeyCache(conversationId: conversation.conversationId)
+            let doubleRatchet = DoubleRatchet(sessionState: sessionState, messageKeyCache: messageKeyCache)
 
             doubleRatchet.setLogger(logger)
             
@@ -303,7 +302,8 @@ public class CryptoManager {
 
         let keyAgreementInitiation = try handshake.initiateKeyAgreement(remoteIdentityKey: remoteIdentityKey.keyExchangeKey, remotePrekey: remoteSignedPrekey.keyExchangeKey, prekeySignature: remotePrekeySignature, remoteOneTimePrekey: remoteOneTimePrekey?.keyExchangeKey, identityKeyPair: identityKeyPair, prekey: prekey.keyExchangeKey, prekeySignatureVerifier: verifier, info: info)
 
-        let doubleRatchet = try DoubleRatchet(keyPair: nil, remotePublicKey: remoteSignedPrekey.keyExchangeKey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: Self.maxSkip, maxCache: maxCache, info: info)
+        let messageKeyCache = try cryptoStore.messageKeyCache(conversationId: conversationId)
+        let doubleRatchet = try DoubleRatchet(keyPair: nil, remotePublicKey: remoteSignedPrekey.keyExchangeKey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: Self.maxSkip, info: info, messageKeyCache: messageKeyCache)
         doubleRatchet.setLogger(logger)
         let conversation = Conversation(userId: userId, conversationId: conversationId)
         doubleRatchets[conversation] = doubleRatchet
@@ -328,7 +328,8 @@ public class CryptoManager {
 
         let sharedSecret = try handshake.sharedSecretFromKeyAgreement(remoteIdentityKey: conversationInvitation.identityKey.keyExchangeKey, remoteEphemeralKey: conversationInvitation.ephemeralKey.keyExchangeKey, usedOneTimePrekeyPair: oneTimePrekeyPair.keyExchangeKeyPair, identityKeyPair: identityKeyPair, prekeyPair: prekeyPair, info: info)
 
-        let doubleRatchet = try DoubleRatchet(keyPair: prekeyPair, remotePublicKey: nil, sharedSecret: sharedSecret, maxSkip: Self.maxSkip, maxCache: maxCache, info: info)
+        let messageKeyCache = try cryptoStore.messageKeyCache(conversationId: conversationId)
+        let doubleRatchet = try DoubleRatchet(keyPair: prekeyPair, remotePublicKey: nil, sharedSecret: sharedSecret, maxSkip: Self.maxSkip, info: info, messageKeyCache: messageKeyCache)
         doubleRatchet.setLogger(logger)
         let conversation = Conversation(userId: userId, conversationId: conversationId)
         doubleRatchets[conversation] = doubleRatchet

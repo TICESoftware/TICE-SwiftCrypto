@@ -329,6 +329,7 @@ enum TestCryptoStoreError: Error {
 }
 
 class TestCryptoStore: CryptoStore {
+    
     var identityKeyPair: TICEModels.KeyPair?
     var prekeyPair: TICEModels.KeyPair?
     var prekeySignature: Signature?
@@ -390,6 +391,10 @@ class TestCryptoStore: CryptoStore {
 
     func loadConversationStates() throws -> [ConversationState] {
         []
+    }
+    
+    func messageKeyCache(conversationId: ConversationId) throws -> MessageKeyCache {
+        return TestMessageKeyCache()
     }
 }
 
