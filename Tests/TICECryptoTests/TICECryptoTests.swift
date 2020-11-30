@@ -340,6 +340,35 @@ final class CryptoTests: XCTestCase {
         _ = try cryptoManager.decrypt(encryptedMessage: encryptedMessage, from: bob.userId, conversationId: conversationId)
     }
     
+    func testLeadingMultipleNullBytesInRSSignature() throws {
+        let rsJWTToken = "eyJhbGciOiJFUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2MDY3MzY5ODguNTc2ODA4OSwibm9uY2UiOiJ2dFVjVmFuVnByMER1TnNOTWxrNVN3PT0iLCJpc3MiOiIwRjA0RUQ4MC0wRTVBLTQwRjgtQUU0NS03Nzg4OUI0NkRDNEIiLCJpYXQiOjE2MDY3MzY4NjguNTc2ODA4OX0.AFEESKRpYY5zIgIDROtfTkvFcoEal_VlNimm5ofN8fudvAsYsfxXqStZc2kjctPlLoDGGtcJThKtlAs_A-BMwukoAABu7l-J58y77RC64iFoqu0uvlXghLKjWpKSBvC2y8_PaYaE2sDtBPaO32gzeczzdwEii_2AS2JmJfhbFxPM3dNM"
+        let publicKey = """
+        -----BEGIN PUBLIC KEY-----
+        MIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQAUv0xnZNJSXFcSCtKB0Js/UlMIpx1
+        k9n3LjQRzFccYv4Qa5qL2uZbxugcDy6ute6lHklfOtHYfrHD/PuRrlTcGtYBQsoO
+        P7ugG1Ykzg3jJE0GauGbhX5B+6ROElPYhtbG3uQn5u+51YXaHJpy+3DEbH7EuA6s
+        4zQLF3AZJZwEAwVZF0I=
+        -----END PUBLIC KEY-----
+        """
+        
+        let signer = try JWTSigner.es512(key: .public(pem: publicKey))
+        
+        let asn1Token = try jwtRSTojwtAsn1(rsJWTToken)
+        let rsToken = try jwtAsn1TojwtRS(asn1Token)
+        
+        _ = try signer.verify(rsToken, as: EmptyPayloadClaims.self)
+    }
+    
+    func testGenerateMemberships() throws {
+        let testUser = TestUser(userId: UserId())
+        let loops = 100
+        for i in 0..<loops {
+            let authHeader = try cryptoManager.generateAuthHeader(signingKey: testUser.privateSigningKey, userId: testUser.userId)
+            let verified = cryptoManager.verify(authHeader: authHeader, publicKey: testUser.publicSigningKey)
+            XCTAssertTrue(verified)
+        }
+    }
+    
     func testLinuxTestSuiteIncludesAllTests() {
         #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
         let thisClass = type(of: self)
@@ -366,6 +395,8 @@ final class CryptoTests: XCTestCase {
         ("testRemainingValidityTime", testRemainingValidityTime),
         ("testInitializeConversation", testInitializeConversation),
         ("testMaxSkipExceeded", testMaxSkipExceeded),
+        ("testGenerateMemberships", testGenerateMemberships),
+        ("testLeadingMultipleNullBytesInRSSignature", testLeadingMultipleNullBytesInRSSignature),
         ("testLinuxTestSuiteIncludesAllTests", testLinuxTestSuiteIncludesAllTests),
     ]
 }
@@ -483,4 +514,8 @@ struct SwiftJWTAuthHeaderClaims: Claims {
     public let iat: Date?
     public let exp: Date?
     public let nonce: Data
+}
+
+struct EmptyPayloadClaims: JWTPayload {
+    func verify(using signer: JWTKit.JWTSigner) throws {}
 }
