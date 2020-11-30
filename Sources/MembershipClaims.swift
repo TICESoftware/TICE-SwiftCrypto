@@ -4,18 +4,36 @@
 
 import Foundation
 import TICEModels
-import SwiftJWT
+import JWTKit
 
 public typealias JWTId = UUID
 
-public struct MembershipClaims: Claims {
+public struct MembershipClaims: JWTPayload {
     public let jti: JWTId
     public let iss: Issuer
     public let sub: UserId
-    public let iat: Date?
-    public let exp: Date?
+    public let iat: IssuedAtClaim?
+    public let exp: ExpirationClaim?
     public let groupId: GroupId
     public let admin: Bool
+    
+    public init(jti: JWTId, iss: Issuer, sub: UserId, iat: Date?, exp: Date?, groupId: GroupId, admin: Bool) {
+        self.jti = jti
+        self.iss = iss
+        self.sub = sub
+        self.iat = iat.map { IssuedAtClaim(value: $0) }
+        self.exp = exp.map { ExpirationClaim(value: $0) }
+        self.groupId = groupId
+        self.admin = admin
+    }
+    
+    public func validateClaims() throws {
+        try exp?.verifyNotExpired(currentDate: Date().addingTimeInterval(CryptoManager.jwtValidationLeeway))
+        try iat?.verifyIssuedInPast(currentDate: Date().addingTimeInterval(CryptoManager.jwtValidationLeeway))
+    }
+    
+    public func verify(using signer: JWTSigner) throws {
+    }
 
     public enum Issuer: Codable, Equatable, CustomStringConvertible {
         case server

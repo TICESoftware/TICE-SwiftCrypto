@@ -32,18 +32,27 @@
         "package": "DoubleRatchet",
         "repositoryURL": "https://github.com/TICESoftware/DoubleRatchet.git",
         "state": {
-          "branch": null,
-          "revision": "63b308bdebc51c26618da6100713caadd5ea8a80",
-          "version": "1.2.4"
+          "branch": "linux",
+          "revision": "046c355774ce3b5d8e0c688f50791d52016dddfe",
+          "version": null
         }
       },
       {
         "package": "HKDF",
         "repositoryURL": "https://github.com/TICESoftware/HKDF.git",
         "state": {
+          "branch": "linux",
+          "revision": "7fe6ffc9d9a2c2102eef55c240ec3d1b53cfaf3e",
+          "version": null
+        }
+      },
+      {
+        "package": "jwt-kit",
+        "repositoryURL": "https://github.com/vapor/jwt-kit.git",
+        "state": {
           "branch": null,
-          "revision": "9cd780c25d41355113662144dc135dde216428cd",
-          "version": "1.0.8"
+          "revision": "6055fe8439769aa3646a3c797d573ce7305849c8",
+          "version": "4.2.0"
         }
       },
       {
@@ -62,6 +71,15 @@
           "branch": null,
           "revision": "3357dd9526cdf9436fa63bb792b669e6efdc43da",
           "version": "1.9.0"
+        }
+      },
+      {
+        "package": "swift-crypto",
+        "repositoryURL": "https://github.com/apple/swift-crypto.git",
+        "state": {
+          "branch": null,
+          "revision": "9680b7251cd2be22caaed8f1468bd9e8915a62fb",
+          "version": "1.1.2"
         }
       },
       {
@@ -84,11 +102,11 @@
       },
       {
         "package": "Sodium",
-        "repositoryURL": "https://github.com/jedisct1/swift-sodium",
+        "repositoryURL": "https://github.com/TICESoftware/swift-sodium.git",
         "state": {
-          "branch": null,
-          "revision": "176745ddc4991b27f80c3c2637652eb33b5782eb",
-          "version": "0.9.0"
+          "branch": "linux",
+          "revision": "d9ce2f0a2746f978ecd7d2c49f4fae2486f34567",
+          "version": null
         }
       },
       {
@@ -104,9 +122,9 @@
         "package": "X3DH",
         "repositoryURL": "https://github.com/TICESoftware/X3DH.git",
         "state": {
-          "branch": null,
-          "revision": "dc915c925849533637c8ca79b711db39f4e3ec25",
-          "version": "2.0.7"
+          "branch": "linux",
+          "revision": "059a426760a15d5baf8d15fae4fd5371b4aba020",
+          "version": null
         }
       }
     ]

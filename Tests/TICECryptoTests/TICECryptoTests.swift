@@ -1,9 +1,11 @@
 import XCTest
 import SwiftJWT
+import JWTKit
 import CryptorECC
 import DoubleRatchet
 import X3DH
 import Logging
+import Sodium
 @testable import TICEModels
 @testable import TICECrypto
 
@@ -78,11 +80,11 @@ final class CryptoTests: XCTestCase {
 
     func testValidateExpiredCertificate() throws {
         let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(-20), exp: Date().addingTimeInterval(-10), groupId: groupId, admin: true)
-        var jwt = JWT(claims: claims)
-
+        
         let privateKeyData = Data(user.privateSigningKey)
-        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData, signatureType: .asn1)
-        let certificate = try jwt.sign(using: jwtSigner)
+        let jwtSigner = JWTKit.JWTSigner.es512(key: try ECDSAKey.private(pem: privateKeyData))
+        let jwt = try jwtSigner.sign(claims)
+        let certificate = try jwtRSTojwtAsn1(jwt)
 
         do {
             try cryptoManager.validateUserSignedMembershipCertificate(certificate: certificate, membership: membership, issuer: user)
@@ -90,7 +92,7 @@ final class CryptoTests: XCTestCase {
         } catch {
             guard case CryptoManagerError.certificateValidationFailed(let certificateValidationError) = error,
                 case CertificateValidationError.expired(let validateClaimsResult) = certificateValidationError,
-                validateClaimsResult == .expired else {
+                validateClaimsResult == "expired" else {
                     XCTFail("Invalid error type (expected invalid claims): \(error.localizedDescription)")
                     return
             }
@@ -99,11 +101,11 @@ final class CryptoTests: XCTestCase {
 
     func testValidateCertificateIssuedInFuture() throws {
         let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(60), exp: Date().addingTimeInterval(3600), groupId: groupId, admin: true)
-        var jwt = JWT(claims: claims)
-
+        
         let privateKeyData = Data(user.privateSigningKey)
-        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData, signatureType: .asn1)
-        let certificate = try jwt.sign(using: jwtSigner)
+        let jwtSigner = JWTKit.JWTSigner.es512(key: try ECDSAKey.private(pem: privateKeyData))
+        let jwt = try jwtSigner.sign(claims)
+        let certificate = try jwtRSTojwtAsn1(jwt)
 
         do {
             try cryptoManager.validateUserSignedMembershipCertificate(certificate: certificate, membership: membership, issuer: user)
@@ -111,7 +113,7 @@ final class CryptoTests: XCTestCase {
         } catch {
             guard case CryptoManagerError.certificateValidationFailed(let certificateValidationError) = error,
                 case CertificateValidationError.expired(let validateClaimsResult) = certificateValidationError,
-                validateClaimsResult == .issuedAt else {
+                validateClaimsResult == "issued in future" else {
                     XCTFail("Invalid error type (expected invalid claims): \(error.localizedDescription)")
                     return
             }
@@ -120,15 +122,15 @@ final class CryptoTests: XCTestCase {
 
     func testValidateCertificateInvalidSignature() throws {
         let claims = MembershipClaims(jti: JWTId(), iss: .user(userId), sub: userId, iat: Date().addingTimeInterval(60), exp: Date().addingTimeInterval(3600), groupId: groupId, admin: true)
-        var jwt = JWT(claims: claims)
-
+        
         guard let privateKeyData = try ECPrivateKey.make(for: .secp521r1).pemString.data(using: .utf8) else {
             XCTFail("Could not create private key")
             return
         }
-
-        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData, signatureType: .asn1)
-        let certificate = try jwt.sign(using: jwtSigner)
+        
+        let jwtSigner = JWTKit.JWTSigner.es512(key: try ECDSAKey.private(pem: privateKeyData))
+        let jwt = try jwtSigner.sign(claims)
+        let certificate = try jwtRSTojwtAsn1(jwt)
 
         do {
             try cryptoManager.validateUserSignedMembershipCertificate(certificate: certificate, membership: membership, issuer: user)
@@ -140,6 +142,48 @@ final class CryptoTests: XCTestCase {
                 return
             }
         }
+    }
+    
+    func testOldAuthHeaderClaimsVerifiedByNewMethod() throws {
+        let issueDate = Date()
+        let sodium = Sodium()
+        let privateKey = try ECPrivateKey.make(for: .secp521r1)
+        guard let privateKeyData = privateKey.pemString.data(using: .utf8) else {
+            XCTFail("Could not create private key")
+            return
+        }
+        
+        guard let randomBytes = sodium.randomBytes.buf(length: 16) else { throw CryptoManagerError.tokenGenerationFailed }
+        let claims = SwiftJWTAuthHeaderClaims(iss: userId, iat: issueDate, exp: issueDate.addingTimeInterval(120), nonce: Data(randomBytes))
+        var jwt = JWT(claims: claims)
+
+        let jwtSigner = JWTSigner.es512(privateKey: privateKeyData, signatureType: .asn1)
+        let swiftJwtAuthHeader = try jwt.sign(using: jwtSigner)
+        XCTAssertTrue(cryptoManager.verify(authHeader: swiftJwtAuthHeader, publicKey: try privateKey.extractPublicKey().pemString.data(using: .utf8)!))
+    }
+    
+    func testNewAuthHeaderClaimsVerifiedByOldMethod() throws {
+        let privateKey = try ECPrivateKey.make(for: .secp521r1)
+        guard let privateKeyData = privateKey.pemString.data(using: .utf8) else {
+            XCTFail("Could not create private key")
+            return
+        }
+        
+        let authHeader = try cryptoManager.generateAuthHeader(signingKey: privateKeyData, userId: UserId())
+        
+        let jwtVerifier = SwiftJWT.JWTVerifier.es512(publicKey: try privateKey.extractPublicKey().pemString.data(using: .utf8)!, signatureType: .asn1)
+        XCTAssertTrue(JWT<SwiftJWTAuthHeaderClaims>.verify(authHeader, using: jwtVerifier))
+    }
+    
+    func testAuthHeaderClaims() throws {
+        let privateKey = try ECPrivateKey.make(for: .secp521r1)
+        guard let privateKeyData = privateKey.pemString.data(using: .utf8) else {
+            XCTFail("Could not create private key")
+            return
+        }
+                
+        let authHeader = try cryptoManager.generateAuthHeader(signingKey: privateKeyData, userId: UserId())
+        XCTAssertTrue(cryptoManager.verify(authHeader: authHeader, publicKey: try privateKey.extractPublicKey().pemString.data(using: .utf8)!))
     }
 
     func testValidateCertificateDeprecatedIssuerFormat() throws {
@@ -295,6 +339,47 @@ final class CryptoTests: XCTestCase {
         encryptedMessage = try bobsCryptoManager.encrypt(Data(), for: user.userId, conversationId: conversationId)
         _ = try cryptoManager.decrypt(encryptedMessage: encryptedMessage, from: bob.userId, conversationId: conversationId)
     }
+    
+    func testLeadingMultipleNullBytesInRSSignature() throws {
+        let rsJWTToken = "eyJhbGciOiJFUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2MDY3MzY5ODguNTc2ODA4OSwibm9uY2UiOiJ2dFVjVmFuVnByMER1TnNOTWxrNVN3PT0iLCJpc3MiOiIwRjA0RUQ4MC0wRTVBLTQwRjgtQUU0NS03Nzg4OUI0NkRDNEIiLCJpYXQiOjE2MDY3MzY4NjguNTc2ODA4OX0.AFEESKRpYY5zIgIDROtfTkvFcoEal_VlNimm5ofN8fudvAsYsfxXqStZc2kjctPlLoDGGtcJThKtlAs_A-BMwukoAABu7l-J58y77RC64iFoqu0uvlXghLKjWpKSBvC2y8_PaYaE2sDtBPaO32gzeczzdwEii_2AS2JmJfhbFxPM3dNM"
+        let publicKey = """
+        -----BEGIN PUBLIC KEY-----
+        MIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQAUv0xnZNJSXFcSCtKB0Js/UlMIpx1
+        k9n3LjQRzFccYv4Qa5qL2uZbxugcDy6ute6lHklfOtHYfrHD/PuRrlTcGtYBQsoO
+        P7ugG1Ykzg3jJE0GauGbhX5B+6ROElPYhtbG3uQn5u+51YXaHJpy+3DEbH7EuA6s
+        4zQLF3AZJZwEAwVZF0I=
+        -----END PUBLIC KEY-----
+        """
+        
+        let signer = try JWTSigner.es512(key: .public(pem: publicKey))
+        
+        let asn1Token = try jwtRSTojwtAsn1(rsJWTToken)
+        let rsToken = try jwtAsn1TojwtRS(asn1Token)
+        
+        _ = try signer.verify(rsToken, as: EmptyPayloadClaims.self)
+    }
+    
+    func testGenerateMemberships() throws {
+        let testUser = TestUser(userId: UserId())
+        let loops = 100
+        for i in 0..<loops {
+            let authHeader = try cryptoManager.generateAuthHeader(signingKey: testUser.privateSigningKey, userId: testUser.userId)
+            let verified = cryptoManager.verify(authHeader: authHeader, publicKey: testUser.publicSigningKey)
+            XCTAssertTrue(verified)
+        }
+    }
+    
+    func testLinuxTestSuiteIncludesAllTests() {
+        #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+        let thisClass = type(of: self)
+        let linux = thisClass.allTests
+        let darwin = thisClass.defaultTestSuite.tests
+        let linuxNames = Set(linux.map { return "-[\(thisClass) \($0.0)]" })
+        let darwinNames = Set(darwin.map(\.name))
+        let missing = darwinNames.subtracting(linuxNames)
+        XCTAssertEqual(missing.count, 0, "\(missing.count) tests are missing from allTests, namely: \n \(missing)")
+        #endif
+    }
 
     static var allTests = [
         ("testUserSignedMembershipCertificate", testUserSignedMembershipCertificate),
@@ -303,8 +388,16 @@ final class CryptoTests: XCTestCase {
         ("testValidateExpiredCertificate", testValidateExpiredCertificate),
         ("testValidateCertificateIssuedInFuture", testValidateCertificateIssuedInFuture),
         ("testValidateCertificateInvalidSignature", testValidateCertificateInvalidSignature),
+        ("testOldAuthHeaderClaimsVerifiedByNewMethod", testOldAuthHeaderClaimsVerifiedByNewMethod),
+        ("testNewAuthHeaderClaimsVerifiedByOldMethod", testNewAuthHeaderClaimsVerifiedByOldMethod),
+        ("testAuthHeaderClaims", testAuthHeaderClaims),
+        ("testValidateCertificateDeprecatedIssuerFormat", testValidateCertificateDeprecatedIssuerFormat),
+        ("testRemainingValidityTime", testRemainingValidityTime),
         ("testInitializeConversation", testInitializeConversation),
         ("testMaxSkipExceeded", testMaxSkipExceeded),
+        ("testGenerateMemberships", testGenerateMemberships),
+        ("testLeadingMultipleNullBytesInRSSignature", testLeadingMultipleNullBytesInRSSignature),
+        ("testLinuxTestSuiteIncludesAllTests", testLinuxTestSuiteIncludesAllTests),
     ]
 }
 
@@ -414,4 +507,15 @@ struct TestLogHandler: LogHandler {
     func log(level: Logger.Level, message: Logger.Message, metadata: Logger.Metadata?, file: String, function: String, line: UInt) {
         print("TEST log: \(level) \(message) \(file) \(function) \(line)")
     }
+}
+
+struct SwiftJWTAuthHeaderClaims: Claims {
+    public let iss: UserId
+    public let iat: Date?
+    public let exp: Date?
+    public let nonce: Data
+}
+
+struct EmptyPayloadClaims: JWTPayload {
+    func verify(using signer: JWTKit.JWTSigner) throws {}
 }
