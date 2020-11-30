@@ -362,7 +362,7 @@ final class CryptoTests: XCTestCase {
     func testGenerateMemberships() throws {
         let testUser = TestUser(userId: UserId())
         let loops = 100
-        for i in 0..<loops {
+        for _ in 0..<loops {
             let authHeader = try cryptoManager.generateAuthHeader(signingKey: testUser.privateSigningKey, userId: testUser.userId)
             let verified = cryptoManager.verify(authHeader: authHeader, publicKey: testUser.publicSigningKey)
             XCTAssertTrue(verified)

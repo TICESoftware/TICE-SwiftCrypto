@@ -186,15 +186,15 @@ func asn1ToRSSig(asn1: Data) throws -> Data {
     // These must be removed to make r,a a valid EC signature
     let trimmedRData: Data
     let trimmedSData: Data
-    let rExtra = signatureLength/2 - rData.count
-    if rExtra > 0 {
-        trimmedRData = Data(count: rExtra) + rData
+    let rExtra = rData.count - signatureLength/2
+    if rExtra < 0 {
+        trimmedRData = Data(count: -rExtra) + rData
     } else {
         trimmedRData = rData.dropFirst(rExtra)
     }
-    let sExtra = signatureLength/2 - sData.count
-    if sExtra > 0 {
-        trimmedSData = Data(count: sExtra) + sData
+    let sExtra = sData.count - signatureLength/2
+    if sExtra < 0 {
+        trimmedSData = Data(count: -sExtra) + sData
     } else {
         trimmedSData = sData.dropFirst(sExtra)
     }
