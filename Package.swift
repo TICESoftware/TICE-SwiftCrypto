@@ -14,8 +14,8 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/TICESoftware/TICE-SwiftModels.git", Version(19,0,0)..<Version(49,0,0)),
-        .package(url: "https://github.com/TICESoftware/X3DH.git", .branch("linux")),
-        .package(url: "https://github.com/TICESoftware/DoubleRatchet.git", .branch("linux")),
+        .package(url: "https://github.com/TICESoftware/X3DH.git", from: "2.0.8"),
+        .package(url: "https://github.com/TICESoftware/DoubleRatchet.git", from: "2.0.1"),
         
         .package(url: "https://github.com/vapor/jwt-kit.git", from: "4.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.0.0"),

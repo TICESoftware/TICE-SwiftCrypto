@@ -32,18 +32,18 @@
         "package": "DoubleRatchet",
         "repositoryURL": "https://github.com/TICESoftware/DoubleRatchet.git",
         "state": {
-          "branch": "linux",
-          "revision": "046c355774ce3b5d8e0c688f50791d52016dddfe",
-          "version": null
+          "branch": null,
+          "revision": "6f4d4e10092e196dea2c43f2ef137c9335c580d8",
+          "version": "2.0.1"
         }
       },
       {
         "package": "HKDF",
         "repositoryURL": "https://github.com/TICESoftware/HKDF.git",
         "state": {
-          "branch": "linux",
-          "revision": "7fe6ffc9d9a2c2102eef55c240ec3d1b53cfaf3e",
-          "version": null
+          "branch": null,
+          "revision": "c0512a18f9486af535bac1befe3f7df753c5b206",
+          "version": "1.0.9"
         }
       },
       {
@@ -102,11 +102,11 @@
       },
       {
         "package": "Sodium",
-        "repositoryURL": "https://github.com/TICESoftware/swift-sodium.git",
+        "repositoryURL": "https://github.com/jedisct1/swift-sodium.git",
         "state": {
-          "branch": "linux",
-          "revision": "d9ce2f0a2746f978ecd7d2c49f4fae2486f34567",
-          "version": null
+          "branch": null,
+          "revision": "4f9164a0a2c9a6a7ff53a2833d54a5c79c957342",
+          "version": "0.9.1"
         }
       },
       {
@@ -122,9 +122,9 @@
         "package": "X3DH",
         "repositoryURL": "https://github.com/TICESoftware/X3DH.git",
         "state": {
-          "branch": "linux",
-          "revision": "059a426760a15d5baf8d15fae4fd5371b4aba020",
-          "version": null
+          "branch": null,
+          "revision": "47fff98d542da56ef4d53743985c3446e20c956e",
+          "version": "2.0.8"
         }
       }
     ]
