@@ -7,6 +7,17 @@ import Logging
 @testable import TICEModels
 @testable import TICECrypto
 
+// TODO: Extension in TICE-iOS
+extension CryptoManager {
+    public func validateUserSignedMembershipCertificate(certificate: Certificate, membership: Membership, issuer: User) throws {
+        try validate(certificate: certificate, membership: membership, issuer: .user(issuer.userId), publicKey: issuer.publicSigningKey)
+    }
+
+    public func validateServerSignedMembershipCertificate(certificate: Certificate, membership: Membership, publicKey: PublicKey) throws {
+        try validate(certificate: certificate, membership: membership, issuer: .server, publicKey: publicKey)
+    }
+}
+
 final class CryptoTests: XCTestCase {
 
     lazy var logger: Logger = { Logger(label: "software.tice.TICECrypto.tests", factory: TestLogHandler.init) }()

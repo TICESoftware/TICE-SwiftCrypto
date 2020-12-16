@@ -6,24 +6,23 @@
 //
 
 import Foundation
-import TICEModels
 import Sodium
 
 extension KeyExchange.PublicKey {
-    var dataKey: TICEModels.PublicKey { Data(self) }
+    var dataKey: PublicKey { Data(self) }
 }
 
 extension KeyExchange.KeyPair {
-    var dataKeyPair: TICEModels.KeyPair {
-        TICEModels.KeyPair(privateKey: Data(secretKey), publicKey: publicKey.dataKey)
+    var dataKeyPair: KeyPair {
+        KeyPair(privateKey: Data(secretKey), publicKey: publicKey.dataKey)
     }
 }
 
-extension TICEModels.PublicKey {
+extension PublicKey {
     var keyExchangeKey: KeyExchange.PublicKey { Bytes(self) }
 }
 
-extension TICEModels.KeyPair {
+extension KeyPair {
     var keyExchangeKeyPair: KeyExchange.KeyPair {
         KeyExchange.KeyPair(publicKey: publicKey.keyExchangeKey, secretKey: Bytes(privateKey))
     }

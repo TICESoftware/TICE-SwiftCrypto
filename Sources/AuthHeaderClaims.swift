@@ -3,7 +3,6 @@
 //
 
 import Foundation
-import TICEModels
 import SwiftJWT
 
 public struct AuthHeaderClaims: Claims {

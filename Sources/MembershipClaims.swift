@@ -3,7 +3,6 @@
 //
 
 import Foundation
-import TICEModels
 import SwiftJWT
 
 public typealias JWTId = UUID
@@ -49,7 +48,7 @@ public struct MembershipClaims: Claims {
                 }
             } catch is DecodingError {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
-                if let userId = try container.decodeIfPresent(UUID.self, forKey: .user) {
+                if let userId = try container.decodeIfPresent(UserId.self, forKey: .user) {
                     self = .user(userId)
                 } else {
                     let server = try container.decode(String.self, forKey: .server)

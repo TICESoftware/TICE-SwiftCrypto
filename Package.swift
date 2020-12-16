@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "TICECrypto",
     platforms: [
-        .macOS(.v10_14), .iOS(.v12),
+        .macOS(.v10_14), .iOS(.v12), 
     ],
     products: [
         .library(
@@ -24,10 +24,10 @@ let package = Package(
     targets: [
         .target(
             name: "TICECrypto",
-            dependencies: ["TICEModels", "SwiftJWT", "CryptorECC", "X3DH", "DoubleRatchet", .product(name: "Logging", package: "swift-log")],
+            dependencies: ["SwiftJWT", "CryptorECC", "X3DH", "DoubleRatchet", .product(name: "Logging", package: "swift-log")],
             path: "Sources"),
         .testTarget(
             name: "TICECryptoTests",
-            dependencies: ["TICECrypto", "TICEModels", "SwiftJWT", "CryptorECC", "DoubleRatchet", "X3DH"]),
+            dependencies: ["SwiftJWT", "CryptorECC", "X3DH", "DoubleRatchet", "TICECrypto", "TICEModels"]),
     ]
 )

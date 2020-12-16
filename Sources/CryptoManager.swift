@@ -3,7 +3,6 @@
 //
 
 import Foundation
-import TICEModels
 import SwiftJWT
 import CryptorECC
 import X3DH
@@ -80,13 +79,180 @@ public struct Conversation: Hashable, Codable {
     }
 }
 
-public class CryptoManager {
+@propertyWrapper
+internal class SynchronizedProperty<T> {
+    private let propertyQueue = DispatchQueue(label: "de.anbion.TICECrypto.synchronizedProperty", attributes: .concurrent)
+    private var value: T
 
-    public static let maxSkip = 5000
+    public var wrappedValue: T {
+        get { return propertyQueue.sync { value } }
+        set { propertyQueue.async(flags: .barrier) { [weak self] in self?.value = newValue } }
+    }
+
+    public init(wrappedValue: T) {
+        self.value = wrappedValue
+    }
+}
+
+// TODO: Move to TICE-iOS
+//public class ConversationCryptoManager {
+//
+//    public static let maxSkip = 5000
+//
+//    let cryptoManager: CryptoManager
+//    let cryptoStore: CryptoStore
+//    let encoder: JSONEncoder
+//    let decoder: JSONDecoder
+//    let logger: Logger
+//    let info = "TICE"
+//    let maxCache = 5010
+//
+//    @SynchronizedProperty var doubleRatchets: [Conversation: DoubleRatchet] = [:]
+//
+//    public init(cryptoManager: CryptoManager, cryptoStore: CryptoStore, encoder: JSONEncoder, decoder: JSONDecoder, logger: Logger) {
+//        self.cryptoManager = cryptoManager
+//        self.cryptoStore = cryptoStore
+//        self.encoder = encoder
+//        self.decoder = decoder
+//        self.logger = logger
+//    }
+//
+//    private func saveConversationState(for conversation: Conversation) throws {
+//        guard let doubleRatchet = doubleRatchets[conversation] else { return }
+//        let sessionState = doubleRatchet.sessionState
+//
+//        let rootChainKeyPair = KeyPair(privateKey: Data(sessionState.rootChainKeyPair.secretKey), publicKey: Data(sessionState.rootChainKeyPair.publicKey))
+//        let messageKeyCache = try encoder.encode(sessionState.messageKeyCacheState)
+//        let conversationState = ConversationState(userId: conversation.userId, conversationId: conversation.conversationId, rootKey: Data(sessionState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: sessionState.rootChainRemotePublicKey.map { Data($0) }, sendingChainKey: sessionState.sendingChainKey.map { Data($0) }, receivingChainKey: sessionState.receivingChainKey.map { Data($0) }, sendMessageNumber: sessionState.sendMessageNumber, receivedMessageNumber: sessionState.receivedMessageNumber, previousSendingChainLength: sessionState.previousSendingChainLength, messageKeyCache: messageKeyCache)
+//        try cryptoStore.save(conversationState)
+//    }
+//
+//    public func reloadConversationStates() throws {
+//        var doubleRatchets: [Conversation: DoubleRatchet] = [:]
+//        for conversationState in try cryptoStore.loadConversationStates() {
+//            let rootChainKeyPair = KeyExchange.KeyPair(publicKey: Bytes(conversationState.rootChainKeyPair.publicKey), secretKey: Bytes(conversationState.rootChainKeyPair.privateKey))
+//            let messageKeyCacheState = try decoder.decode(MessageKeyCacheState.self, from: conversationState.messageKeyCache)
+//            let sessionState = SessionState(rootKey: Bytes(conversationState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: conversationState.rootChainRemotePublicKey.map { Bytes($0) }, sendingChainKey: conversationState.sendingChainKey.map { Bytes($0) }, receivingChainKey: conversationState.receivingChainKey.map { Bytes($0) }, sendMessageNumber: conversationState.sendMessageNumber, receivedMessageNumber: conversationState.receivedMessageNumber, previousSendingChainLength: conversationState.previousSendingChainLength, messageKeyCacheState: messageKeyCacheState, info: info, maxSkip: Self.maxSkip, maxCache: maxCache)
+//
+//            let conversation = Conversation(userId: conversationState.userId, conversationId: conversationState.conversationId)
+//            let messageKeyCache = try self.cryptoStore?.messageKeyCache(conversationId: conversation.conversationId)
+//            let doubleRatchet = DoubleRatchet(sessionState: sessionState, messageKeyCache: messageKeyCache)
+//
+//            doubleRatchet.setLogger(logger)
+//
+//            doubleRatchets[conversation] = doubleRatchet
+//        }
+//        self.doubleRatchets = doubleRatchets
+//    }
+//
+//    public func initConversation(with userId: UserId, conversationId: ConversationId, remoteIdentityKey: PublicKey, remoteSignedPrekey: PublicKey, remotePrekeySignature: Signature, remoteOneTimePrekey: PublicKey?, remoteSigningKey: PublicKey) throws -> ConversationInvitation {
+//
+//        guard let remoteSigningKeyPemString = Bytes(remoteSigningKey).utf8String else {
+//            throw CryptoManagerError.invalidKey
+//        }
+//        let remoteSigningKey = try ECPublicKey(key: remoteSigningKeyPemString)
+//
+//        let verifier: PrekeySignatureVerifier = { signature throws in
+//            try self.cryptoManager.verify(prekeySignature: signature, prekey: remoteSignedPrekey, verificationPublicKey: remoteSigningKey)
+//        }
+//
+//        let identityKeyPair = try cryptoStore.loadIdentityKeyPair().keyExchangeKeyPair
+//        let prekey = try cryptoStore.loadPrekeyPair().publicKey
+//
+//        let keyAgreementInitiation = try cryptoManager.handshake.initiateKeyAgreement(remoteIdentityKey: remoteIdentityKey.keyExchangeKey, remotePrekey: remoteSignedPrekey.keyExchangeKey, prekeySignature: remotePrekeySignature, remoteOneTimePrekey: remoteOneTimePrekey?.keyExchangeKey, identityKeyPair: identityKeyPair, prekey: prekey.keyExchangeKey, prekeySignatureVerifier: verifier, info: info)
+//
+//		  let messageKeyCache = try cryptoStore.messageKeyCache(conversationId: conversationId)
+//        let doubleRatchet = try DoubleRatchet(keyPair: nil, remotePublicKey: remoteSignedPrekey.keyExchangeKey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: Self.maxSkip, info: info, messageKeyCache: messageKeyCache)
+//        doubleRatchet.setLogger(logger)
+//        let conversation = Conversation(userId: userId, conversationId: conversationId)
+//        doubleRatchets[conversation] = doubleRatchet
+//        try saveConversationState(for: conversation)
+//
+//        return ConversationInvitation(identityKey: identityKeyPair.publicKey.dataKey, ephemeralKey: keyAgreementInitiation.ephemeralPublicKey.dataKey, usedOneTimePrekey: remoteOneTimePrekey)
+//    }
+//
+//    public func processConversationInvitation(_ conversationInvitation: ConversationInvitation, from userId: UserId, conversationId: ConversationId) throws {
+//        guard let publicOneTimePrekey = conversationInvitation.usedOneTimePrekey else {
+//            throw CryptoManagerError.oneTimePrekeyMissing
+//        }
+//        let privateOneTimePrekey = try cryptoStore.loadPrivateOneTimePrekey(publicKey: publicOneTimePrekey)
+//
+//        let identityKeyPair = try cryptoStore.loadIdentityKeyPair().keyExchangeKeyPair
+//        let prekeyPair = try cryptoStore.loadPrekeyPair().keyExchangeKeyPair
+//        let oneTimePrekeyPair = KeyPair(privateKey: privateOneTimePrekey, publicKey: publicOneTimePrekey)
+//
+//        let sharedSecret = try cryptoManager.handshake.sharedSecretFromKeyAgreement(remoteIdentityKey: conversationInvitation.identityKey.keyExchangeKey, remoteEphemeralKey: conversationInvitation.ephemeralKey.keyExchangeKey, usedOneTimePrekeyPair: oneTimePrekeyPair.keyExchangeKeyPair, identityKeyPair: identityKeyPair, prekeyPair: prekeyPair, info: info)
+//
+//        let doubleRatchet = try DoubleRatchet(keyPair: prekeyPair, remotePublicKey: nil, sharedSecret: sharedSecret, maxSkip: Self.maxSkip, maxCache: maxCache, info: info)
+//        doubleRatchet.setLogger(logger)
+//        let conversation = Conversation(userId: userId, conversationId: conversationId)
+//        doubleRatchets[conversation] = doubleRatchet
+//        try saveConversationState(for: conversation)
+//
+//        try cryptoStore.deleteOneTimePrekeyPair(publicKey: publicOneTimePrekey)
+//    }
+//
+//    public func conversationExisting(userId: UserId, conversationId: ConversationId) -> Bool {
+//        let conversation = Conversation(userId: userId, conversationId: conversationId)
+//        return doubleRatchets.keys.contains(conversation)
+//    }
+//
+//    public func conversationFingerprint(ciphertext: Ciphertext) throws -> ConversationFingerprint {
+//        let encryptedMessage = try decoder.decode(Message.self, from: ciphertext)
+//        return Data(encryptedMessage.header.publicKey).base64EncodedString()
+//    }
+//
+//    public func encrypt(_ data: Data, for userId: UserId, conversationId: ConversationId) throws -> Ciphertext {
+//        let conversation = Conversation(userId: userId, conversationId: conversationId)
+//        guard let doubleRatchet = doubleRatchets[conversation] else {
+//            throw CryptoManagerError.conversationNotInitialized
+//        }
+//
+//        let message = try doubleRatchet.encrypt(plaintext: Bytes(data))
+//        try saveConversationState(for: conversation)
+//
+//        return try encoder.encode(message)
+//    }
+//
+//    private func decrypt(encryptedSecretKey: Ciphertext, from userId: UserId, conversationId: ConversationId) throws -> SecretKey {
+//        let messageKeyData = try decrypt(encryptedMessage: encryptedSecretKey, from: userId, conversationId: conversationId)
+//        return SecretKey(messageKeyData)
+//    }
+//
+//    public func decrypt(encryptedMessage: Ciphertext, from userId: UserId, conversationId: ConversationId) throws -> Data {
+//        let encryptedMessage = try decoder.decode(Message.self, from: encryptedMessage)
+//        let conversation = Conversation(userId: userId, conversationId: conversationId)
+//        guard let doubleRatchet = doubleRatchets[conversation] else {
+//            throw CryptoManagerError.conversationNotInitialized
+//        }
+//
+//        let plaintext: Bytes
+//        do {
+//            plaintext = try doubleRatchet.decrypt(message: encryptedMessage)
+//        } catch DRError.exceedMaxSkip {
+//            throw CryptoManagerError.maxSkipExceeded
+//        } catch DRError.discardOldMessage {
+//            throw CryptoManagerError.discardedObsoleteMessage
+//        } catch {
+//            throw CryptoManagerError.decryptionError(error)
+//        }
+//
+//        try saveConversationState(for: conversation)
+//
+//        return Data(plaintext)
+//    }
+//
+//    public func decrypt(encryptedData: Ciphertext, encryptedSecretKey: Ciphertext, from userId: UserId, conversationId: ConversationId) throws -> Data {
+//        let secretKey = try decrypt(encryptedSecretKey: encryptedSecretKey, from: userId, conversationId: conversationId)
+//        let plaintext = try cryptoManager.decrypt(encryptedData: encryptedData, secretKey: secretKey)
+//
+//        return plaintext
+//    }
+//}
+
+public class CryptoManager {
     
     let sodium = Sodium()
-    let info = "TICE"
-    let maxCache = 5010
     let oneTimePrekeyCount = 100
     public let certificatesValidFor: TimeInterval = 60*60*24*30*12
     public let jwtValidationLeeway: TimeInterval = 5
@@ -94,7 +260,6 @@ public class CryptoManager {
     let logger: Logger
 
     var handshake: X3DH
-    @SynchronizedProperty var doubleRatchets: [Conversation: DoubleRatchet]
 
     let cryptoStore: CryptoStore?
     let encoder: JSONEncoder
@@ -105,40 +270,7 @@ public class CryptoManager {
         self.encoder = encoder
         self.decoder = decoder
         self.handshake = X3DH()
-        self.doubleRatchets = [:]
         self.logger = logger
-    }
-
-    // MARK: Persistence
-
-    private func saveConversationState(for conversation: Conversation) throws {
-        guard let doubleRatchet = doubleRatchets[conversation] else { return }
-        let sessionState = doubleRatchet.sessionState
-
-        let rootChainKeyPair = TICEModels.KeyPair(privateKey: Data(sessionState.rootChainKeyPair.secretKey), publicKey: Data(sessionState.rootChainKeyPair.publicKey))
-        let conversationState = ConversationState(userId: conversation.userId, conversationId: conversation.conversationId, rootKey: Data(sessionState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: sessionState.rootChainRemotePublicKey.map { Data($0) }, sendingChainKey: sessionState.sendingChainKey.map { Data($0) }, receivingChainKey: sessionState.receivingChainKey.map { Data($0) }, sendMessageNumber: sessionState.sendMessageNumber, receivedMessageNumber: sessionState.receivedMessageNumber, previousSendingChainLength: sessionState.previousSendingChainLength)
-        try cryptoStore?.save(conversationState)
-    }
-
-    public func reloadConversationStates() throws {
-        guard let cryptoStore = cryptoStore else {
-            throw CryptoManagerError.cryptoStoreNotFound
-        }
-
-        var doubleRatchets: [Conversation: DoubleRatchet] = [:]
-        for conversationState in try cryptoStore.loadConversationStates() {
-            let rootChainKeyPair = KeyExchange.KeyPair(publicKey: Bytes(conversationState.rootChainKeyPair.publicKey), secretKey: Bytes(conversationState.rootChainKeyPair.privateKey))
-            let sessionState = SessionState(rootKey: Bytes(conversationState.rootKey), rootChainKeyPair: rootChainKeyPair, rootChainRemotePublicKey: conversationState.rootChainRemotePublicKey.map { Bytes($0) }, sendingChainKey: conversationState.sendingChainKey.map { Bytes($0) }, receivingChainKey: conversationState.receivingChainKey.map { Bytes($0) }, sendMessageNumber: conversationState.sendMessageNumber, receivedMessageNumber: conversationState.receivedMessageNumber, previousSendingChainLength: conversationState.previousSendingChainLength, info: info, maxSkip: Self.maxSkip)
-
-            let conversation = Conversation(userId: conversationState.userId, conversationId: conversationState.conversationId)
-            let messageKeyCache = try self.cryptoStore?.messageKeyCache(conversationId: conversation.conversationId)
-            let doubleRatchet = DoubleRatchet(sessionState: sessionState, messageKeyCache: messageKeyCache)
-
-            doubleRatchet.setLogger(logger)
-            
-            doubleRatchets[conversation] = doubleRatchet
-        }
-        self.doubleRatchets = doubleRatchets
     }
 
     // MARK: Key generation
@@ -147,11 +279,11 @@ public class CryptoManager {
         sodium.randomBytes.buf(length: length).map { SecretKey($0) }
     }
 
-    public func generateSigningKeyPair() throws -> TICEModels.KeyPair {
+    public func generateSigningKeyPair() throws -> KeyPair {
         let privateSigningKey = try ECPrivateKey.make(for: .secp521r1)
         let publicSigningKey = try privateSigningKey.extractPublicKey()
 
-        return TICEModels.KeyPair(privateKey: signingKey(from: privateSigningKey.pemString), publicKey: signingKey(from: publicSigningKey.pemString))
+        return KeyPair(privateKey: signingKey(from: privateSigningKey.pemString), publicKey: signingKey(from: publicSigningKey.pemString))
     }
 
     public func signingKeyString(from key: Data) throws -> String {
@@ -179,7 +311,7 @@ public class CryptoManager {
         return try createMembershipCertificate(jwtId: jwtId, userId: userId, groupId: groupId, admin: admin, issuer: .server, signingKey: signingKey)
     }
 
-    private func createMembershipCertificate(jwtId: JWTId, userId: UserId, groupId: GroupId, admin: Bool, issuer: MembershipClaims.Issuer, signingKey: PrivateKey) throws -> Certificate {
+    public func createMembershipCertificate(jwtId: JWTId, userId: UserId, groupId: GroupId, admin: Bool, issuer: MembershipClaims.Issuer, signingKey: PrivateKey) throws -> Certificate {
         let issueDate = Date()
 
         let claims = MembershipClaims(jti: jwtId, iss: issuer, sub: userId, iat: issueDate, exp: issueDate.addingTimeInterval(certificatesValidFor), groupId: groupId, admin: admin)
@@ -190,22 +322,14 @@ public class CryptoManager {
         return try jwt.sign(using: jwtSigner)
     }
 
-    public func validateUserSignedMembershipCertificate(certificate: Certificate, membership: Membership, issuer: User) throws {
-        try validate(certificate: certificate, membership: membership, issuer: .user(issuer.userId), publicKey: issuer.publicSigningKey)
-    }
-
-    public func validateServerSignedMembershipCertificate(certificate: Certificate, membership: Membership, publicKey: TICEModels.PublicKey) throws {
-        try validate(certificate: certificate, membership: membership, issuer: .server, publicKey: publicKey)
-    }
-
-    private func validate(certificate: Certificate, membership: Membership, issuer: MembershipClaims.Issuer, publicKey: TICEModels.PublicKey) throws {
+    public func validate(certificate: Certificate, groupId: GroupId, userId: UserId, admin: Bool, issuer: MembershipClaims.Issuer, publicKey: PublicKey) throws {
         let jwtVerifier = JWTVerifier.es512(publicKey: publicKey, signatureType: signatureType(of: certificate))
 
         let jwt = try JWT<MembershipClaims>(jwtString: certificate)
 
-        guard jwt.claims.groupId == membership.groupId,
-            jwt.claims.sub == membership.userId,
-            (!membership.admin || jwt.claims.admin) else {
+        guard jwt.claims.groupId == groupId,
+            jwt.claims.sub == userId,
+            (jwt.claims.admin || !admin) else {
             throw CryptoManagerError.certificateValidationFailed(CertificateValidationError.invalidMembership)
         }
 
@@ -233,10 +357,10 @@ public class CryptoManager {
         return exp.timeIntervalSince(Date())
     }
 
-    public func tokenKeyForGroupWith(groupKey: SecretKey, user: UserProtocol) throws -> SecretKey {
+    public func tokenKeyForGroupWith(groupKey: SecretKey, signingKey: PublicKey) throws -> SecretKey {
         var inputKeyingMaterial = Bytes()
         inputKeyingMaterial.append(contentsOf: groupKey)
-        inputKeyingMaterial.append(contentsOf: user.publicSigningKey)
+        inputKeyingMaterial.append(contentsOf: signingKey)
 
         let key = try deriveHKDFKey(ikm: inputKeyingMaterial, L: 32)
         return Data(key)
@@ -244,7 +368,7 @@ public class CryptoManager {
 
     // MARK: Handshake
 
-    public func generateHandshakeKeyMaterial(signer: Signer) throws -> UserPublicKeys {
+    public func generateHandshakeKeyMaterial(signer: Signer) throws -> HandshakeKeyMaterial {
 
         let identityKeyPair = try handshake.generateIdentityKeyPair().dataKeyPair
         try cryptoStore?.saveIdentityKeyPair(identityKeyPair)
@@ -252,14 +376,14 @@ public class CryptoManager {
         return try renewHandshakeKeyMaterial(signer: signer, renewSignedPrekey: true)
     }
 
-    public func renewHandshakeKeyMaterial(signer: Signer, renewSignedPrekey: Bool) throws -> UserPublicKeys {
+    public func renewHandshakeKeyMaterial(signer: Signer, renewSignedPrekey: Bool) throws -> HandshakeKeyMaterial {
         guard let cryptoStore = cryptoStore else {
             throw CryptoManagerError.cryptoStoreNotFound
         }
 
         let identityKeyPair = try cryptoStore.loadIdentityKeyPair()
 
-        let prekeyPair: TICEModels.KeyPair
+        let prekeyPair: KeyPair
         let prekeySignature: Signature
         if renewSignedPrekey {
             logger.debug("Renewing signed prekey.")
@@ -280,72 +404,7 @@ public class CryptoManager {
         let privateSigningKey = try ECPrivateKey(key: privateSigningKeyString)
         let publicSigningKey = try privateSigningKey.extractPublicKey()
 
-        return UserPublicKeys(signingKey: signingKey(from: publicSigningKey.pemString), identityKey: identityKeyPair.publicKey, signedPrekey: prekeyPair.publicKey, prekeySignature: prekeySignature, oneTimePrekeys: oneTimePrekeyPairs.map { $0.publicKey })
-    }
-
-    public func initConversation(with userId: UserId, conversationId: ConversationId, remoteIdentityKey: TICEModels.PublicKey, remoteSignedPrekey: TICEModels.PublicKey, remotePrekeySignature: Signature, remoteOneTimePrekey: TICEModels.PublicKey?, remoteSigningKey: TICEModels.PublicKey) throws -> ConversationInvitation {
-        guard let cryptoStore = cryptoStore else {
-            throw CryptoManagerError.cryptoStoreNotFound
-        }
-
-        guard let remoteSigningKeyPemString = Bytes(remoteSigningKey).utf8String else {
-            throw CryptoManagerError.invalidKey
-        }
-        let remoteSigningKey = try ECPublicKey(key: remoteSigningKeyPemString)
-
-        let verifier: PrekeySignatureVerifier = { signature throws in
-            try self.verify(prekeySignature: signature, prekey: remoteSignedPrekey, verificationPublicKey: remoteSigningKey)
-        }
-
-        let identityKeyPair = try cryptoStore.loadIdentityKeyPair().keyExchangeKeyPair
-        let prekey = try cryptoStore.loadPrekeyPair().publicKey
-
-        let keyAgreementInitiation = try handshake.initiateKeyAgreement(remoteIdentityKey: remoteIdentityKey.keyExchangeKey, remotePrekey: remoteSignedPrekey.keyExchangeKey, prekeySignature: remotePrekeySignature, remoteOneTimePrekey: remoteOneTimePrekey?.keyExchangeKey, identityKeyPair: identityKeyPair, prekey: prekey.keyExchangeKey, prekeySignatureVerifier: verifier, info: info)
-
-        let messageKeyCache = try cryptoStore.messageKeyCache(conversationId: conversationId)
-        let doubleRatchet = try DoubleRatchet(keyPair: nil, remotePublicKey: remoteSignedPrekey.keyExchangeKey, sharedSecret: keyAgreementInitiation.sharedSecret, maxSkip: Self.maxSkip, info: info, messageKeyCache: messageKeyCache)
-        doubleRatchet.setLogger(logger)
-        let conversation = Conversation(userId: userId, conversationId: conversationId)
-        doubleRatchets[conversation] = doubleRatchet
-        try saveConversationState(for: conversation)
-
-        return ConversationInvitation(identityKey: identityKeyPair.publicKey.dataKey, ephemeralKey: keyAgreementInitiation.ephemeralPublicKey.dataKey, usedOneTimePrekey: remoteOneTimePrekey)
-    }
-
-    public func processConversationInvitation(_ conversationInvitation: ConversationInvitation, from userId: UserId, conversationId: ConversationId) throws {
-        guard let cryptoStore = cryptoStore else {
-            throw CryptoManagerError.cryptoStoreNotFound
-        }
-        
-        guard let publicOneTimePrekey = conversationInvitation.usedOneTimePrekey else {
-            throw CryptoManagerError.oneTimePrekeyMissing
-        }
-        let privateOneTimePrekey = try cryptoStore.loadPrivateOneTimePrekey(publicKey: publicOneTimePrekey)
-
-        let identityKeyPair = try cryptoStore.loadIdentityKeyPair().keyExchangeKeyPair
-        let prekeyPair = try cryptoStore.loadPrekeyPair().keyExchangeKeyPair
-        let oneTimePrekeyPair = TICEModels.KeyPair(privateKey: privateOneTimePrekey, publicKey: publicOneTimePrekey)
-
-        let sharedSecret = try handshake.sharedSecretFromKeyAgreement(remoteIdentityKey: conversationInvitation.identityKey.keyExchangeKey, remoteEphemeralKey: conversationInvitation.ephemeralKey.keyExchangeKey, usedOneTimePrekeyPair: oneTimePrekeyPair.keyExchangeKeyPair, identityKeyPair: identityKeyPair, prekeyPair: prekeyPair, info: info)
-
-        let messageKeyCache = try cryptoStore.messageKeyCache(conversationId: conversationId)
-        let doubleRatchet = try DoubleRatchet(keyPair: prekeyPair, remotePublicKey: nil, sharedSecret: sharedSecret, maxSkip: Self.maxSkip, info: info, messageKeyCache: messageKeyCache)
-        doubleRatchet.setLogger(logger)
-        let conversation = Conversation(userId: userId, conversationId: conversationId)
-        doubleRatchets[conversation] = doubleRatchet
-        try saveConversationState(for: conversation)
-
-        try cryptoStore.deleteOneTimePrekeyPair(publicKey: publicOneTimePrekey)
-    }
-
-    public func conversationExisting(userId: UserId, conversationId: ConversationId) -> Bool {
-        let conversation = Conversation(userId: userId, conversationId: conversationId)
-        return doubleRatchets.keys.contains(conversation)
-    }
-
-    public func conversationFingerprint(ciphertext: Ciphertext) throws -> ConversationFingerprint {
-        let encryptedMessage = try decoder.decode(Message.self, from: ciphertext)
-        return Data(encryptedMessage.header.publicKey).base64EncodedString()
+        return HandshakeKeyMaterial(signingKey: signingKey(from: publicSigningKey.pemString), identityKey: identityKeyPair.publicKey, signedPrekey: prekeyPair.publicKey, prekeySignature: prekeySignature, oneTimePrekeys: oneTimePrekeyPairs.map { $0.publicKey })
     }
 
     // MARK: Encryption / Decryption
@@ -370,56 +429,9 @@ public class CryptoManager {
         return Data(plaintext)
     }
 
-    public func encrypt(_ data: Data, for userId: UserId, conversationId: ConversationId) throws -> Ciphertext {
-        let conversation = Conversation(userId: userId, conversationId: conversationId)
-        guard let doubleRatchet = doubleRatchets[conversation] else {
-            throw CryptoManagerError.conversationNotInitialized
-        }
-
-        let message = try doubleRatchet.encrypt(plaintext: Bytes(data))
-        try saveConversationState(for: conversation)
-
-        return try encoder.encode(message)
-    }
-
-    private func decrypt(encryptedSecretKey: Ciphertext, from userId: UserId, conversationId: ConversationId) throws -> SecretKey {
-        let messageKeyData = try decrypt(encryptedMessage: encryptedSecretKey, from: userId, conversationId: conversationId)
-        return SecretKey(messageKeyData)
-    }
-
-    public func decrypt(encryptedMessage: Ciphertext, from userId: UserId, conversationId: ConversationId) throws -> Data {
-        let encryptedMessage = try decoder.decode(Message.self, from: encryptedMessage)
-        let conversation = Conversation(userId: userId, conversationId: conversationId)
-        guard let doubleRatchet = doubleRatchets[conversation] else {
-            throw CryptoManagerError.conversationNotInitialized
-        }
-
-        let plaintext: Bytes
-        do {
-            plaintext = try doubleRatchet.decrypt(message: encryptedMessage)
-        } catch DRError.exceedMaxSkip {
-            throw CryptoManagerError.maxSkipExceeded
-        } catch DRError.discardOldMessage {
-            throw CryptoManagerError.discardedObsoleteMessage
-        } catch {
-            throw CryptoManagerError.decryptionError(error)
-        }
-
-        try saveConversationState(for: conversation)
-
-        return Data(plaintext)
-    }
-
-    public func decrypt(encryptedData: Ciphertext, encryptedSecretKey: Ciphertext, from userId: UserId, conversationId: ConversationId) throws -> Data {
-        let secretKey = try decrypt(encryptedSecretKey: encryptedSecretKey, from: userId, conversationId: conversationId)
-        let plaintext = try decrypt(encryptedData: encryptedData, secretKey: secretKey)
-
-        return plaintext
-    }
-
     // MARK: Sign / verify
 
-    private func sign(prekey: TICEModels.PublicKey, with signer: Signer) throws -> Signature {
+    public func sign(prekey: PublicKey, with signer: Signer) throws -> Signature {
         guard let privateKeyString = Bytes(signer.privateSigningKey).utf8String else {
             throw CryptoManagerError.invalidKey
         }
@@ -428,7 +440,7 @@ public class CryptoManager {
         return sig.asn1
     }
 
-    private func verify(prekeySignature: Signature, prekey: TICEModels.PublicKey, verificationPublicKey: ECPublicKey) throws -> Bool {
+    public func verify(prekeySignature: Signature, prekey: PublicKey, verificationPublicKey: ECPublicKey) throws -> Bool {
         let sig = try ECSignature(asn1: prekeySignature)
         return sig.verify(plaintext: Data(prekey), using: verificationPublicKey)
     }
@@ -455,7 +467,7 @@ public class CryptoManager {
         return jwt.claims.iss
     }
 
-    public func verify(authHeader: Certificate, publicKey: TICEModels.PublicKey) -> Bool {
+    public func verify(authHeader: Certificate, publicKey: PublicKey) -> Bool {
         let jwtVerifier = JWTVerifier.es512(publicKey: publicKey, signatureType: signatureType(of: authHeader))
         return JWT<AuthHeaderClaims>.verify(authHeader, using: jwtVerifier)
     }
